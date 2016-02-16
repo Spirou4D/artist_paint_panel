@@ -639,38 +639,10 @@ class ArtistPanel(bpy.types.Panel):
 
 
 def register():
-    bpy.utils.register_class(MessageOperator)
-    bpy.utils.register_class(OkOperator)
-    bpy.utils.register_class(ImageReload)
-    bpy.utils.register_class(SaveImage)
-    bpy.utils.register_class(BrushMakerScene)
-    bpy.utils.register_class(CanvasShadeless)
-    bpy.utils.register_class(CameraviewPaint)
-    bpy.utils.register_class(CanvasHoriz)
-    bpy.utils.register_class(CanvasVertical)
-    bpy.utils.register_class(RotateCanvasCCW15)
-    bpy.utils.register_class(RotateCanvasCW15)
-    bpy.utils.register_class(RotateCanvasCCW)
-    bpy.utils.register_class(RotateCanvasCW)
-    bpy.utils.register_class(CanvasResetrot)
-    bpy.utils.register_class(ArtistPanel)
+    bpy.utils.register_module(__name__)
 
 def unregister():
-    bpy.utils.unregister_class(ArtistPanel)
-    bpy.utils.unregister_class(CanvasResetrot)
-    bpy.utils.unregister_class(RotateCanvasCW)
-    bpy.utils.unregister_class(RotateCanvasCCW)
-    bpy.utils.unregister_class(RotateCanvasCW15)
-    bpy.utils.unregister_class(RotateCanvasCCW15)
-    bpy.utils.unregister_class(CanvasVertical)
-    bpy.utils.unregister_class(CanvasHoriz)
-    bpy.utils.unregister_class(CameraviewPaint)
-    bpy.utils.unregister_class(CanvasShadeless)
-    bpy.utils.unregister_class(BrushMakerScene)
-    bpy.utils.unregister_class(SaveImage)
-    bpy.utils.unregister_class(ImageReload)
-    bpy.utils.unregister_class(OkOperator)
-    bpy.utils.unregister_class(MessageOperator)
+    bpy.utils.unregister_module(__name__)
 
 
 if __name__ == "__main__":
