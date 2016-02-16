@@ -31,6 +31,7 @@ bl_info = {"name": "Paint Artist Panel",
            "category": "Paint"}
 
 import bpy
+from bpy.props import *
 
 '''
 Modif: 2016-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -38,22 +39,53 @@ Modif: 2016-02'01 Patrick optimize the code
 '''
 
 
+#----------------------------------------------Display message
+class MessageOperator(bpy.types.Operator):
+    bl_idname = "error.message"
+    bl_label = "Message"
+    type = StringProperty()
+    message = StringProperty()
+
+    def execute(self, context):
+        self.report({'INFO'}, self.message)
+        print(self.message)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_popup(self, width=400, height=300)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label("WARNING !")
+        row = layout.row()
+        row.label(self.message)
+        row = layout.row()
+
+
+
+#-----------------------------The OK button in the error dialog
+class OkOperator(bpy.types.Operator):
+    bl_idname = "error.ok"
+    bl_label = "OK"
+    def execute(self, context):
+        return {'FINISHED'}
+
 #-------------------------------------------------reload image
 class ImageReload(bpy.types.Operator):
     """Reload Image Last Saved State"""
     bl_idname = "image.reload_saved_state"
     bl_label = "Reload Image Save Point"
-    bl_options = { 'REGISTER', 'UNDO' }
+    bl_options = {'REGISTER', 'UNDO'}
 
 
     def execute(self, context):
-        scene = context.scene
-        original_type = bpy.context.area.type
-        bpy.context.area.type = 'IMAGE_EDITOR'
+        original_type = context.area.type
+        context.area.type = 'IMAGE_EDITOR'
 
         #return image to last saved state
         bpy.ops.image.reload()
-        bpy.context.area.type = original_type
+        context.area.type = original_type
         return {'FINISHED'}
 
 
@@ -62,17 +94,30 @@ class SaveImage(bpy.types.Operator):
     """Save Image"""
     bl_idname = "image.save_current"
     bl_label = "Save Image Current"
-    bl_options = { 'REGISTER', 'UNDO' }
+    bl_options = {'REGISTER', 'UNDO'}
 
-
+    #A corriger!
     def execute(self, context):
-        scene = context.scene
-        original_type = bpy.context.area.type
-        bpy.context.area.type = 'IMAGE_EDITOR'
+        original_type = context.area.type
+        context.area.type = 'IMAGE_EDITOR'
 
+        #init
+        i = 1
+        obj = context.active_object
+        _obName = obj.name
+        for ob  in bpy.data.objects:
+            if ob.name == _obName + '_' + '{:03d}'.format(i):
+                i += 1
+
+        _obName = _obName + '_' + '{:03d}'.format(i)
         #return image to last saved state
-        bpy.ops.image.save_dirty()
-        bpy.context.area.type = original_type
+        filePATH = obj.data.materials[0].\
+                    texture_slots[0].texture.image.filepath
+        #filePATH = '//../../../../.././brush/Cafeina (26).png'
+        bpy.ops.image.save_as(filepath = filePATH)
+
+
+        context.area.type = original_type
         return {'FINISHED'}
 
 
@@ -81,7 +126,7 @@ class BrushMakerScene(bpy.types.Operator):
     """Create Brush Scene"""
     bl_idname = "scene.create_brush_scene"
     bl_label = "Create Scene for Image Brush Maker"
-    bl_options = { 'REGISTER', 'UNDO' }
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(self, context):
@@ -175,37 +220,46 @@ class CameraviewPaint(bpy.types.Operator):
 
 
     def execute(self, context):
-        #toggle on/off textpaint
+        #init
         obj = context.active_object
+        _obName = obj.name
+        _camName = "Camera_" + _obName
 
-        if obj:
-            mode = obj.mode
-            if mode == 'TEXTURE_PAINT':
-                bpy.ops.paint.texture_paint_toggle()
-
-        #save selected plane by rename
-        context.object.name = "canvas"
-
-        #variable to get image texture dimensions -
-        #thanks to Mutant Bob
         #http://blender.stackexchange.com/users/660/mutant-bob
         select_mat = obj.data.materials[0].texture_slots[0].\
                     texture.image.size[:]
 
+        for cam  in bpy.data.objects:
+            if cam.name == _camName:
+                prefix = 'Already found a camera for this image : '
+                bpy.ops.error.message('INVOKE_DEFAULT',
+                                        type = "Error",
+                                    message =  prefix + _camName )
+                return {'FINISHED'}
+
+        #Cursor to center of world
+        bpy.ops.view3d.snap_cursor_to_center()
+        bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
+
+        #toggle on/off textpaint
+        if obj and (obj.mode == 'TEXTURE_PAINT'):
+            bpy.ops.paint.texture_paint_toggle()
+
         #add camera
         bpy.ops.object.camera_add(view_align=False,
-                    enter_editmode=False,
-                    location=(0, 0, 0),
-                    rotation=(0, 0, 0),
-                    layers=(True, False, False, False, False, False,
-                    False, False,False, False, False, False, False,
-                    False, False, False, False,False, False, False))
+                        enter_editmode=False,
+                        location=(0, 0, 0),
+                        rotation=(0, 0, 0),
+                        layers=(True, False, False, False, False,
+                                False, False, False, False, False,
+                                False, False, False, False, False,
+                                False, False, False, False, False))
 
         #ratio full
-        bpy.context.scene.render.resolution_percentage = 100
+        context.scene.render.resolution_percentage = 100
 
         #name it
-        context.object.name = "Canvas View Paint"
+        context.object.name = _camName
 
         #switch to camera view
         bpy.ops.view3d.object_as_camera()
@@ -229,14 +283,10 @@ class CameraviewPaint(bpy.types.Operator):
                             'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'
                             }
 
-        #found on net Atom wrote this simple script
-        #image_index = 0
-        rnd = bpy.data.scenes[0].render
-        rnd.resolution_x, rnd.resolution_y = select_mat
-
         #resolution
-        rndx = rnd.resolution_x
-        rndy = rnd.resolution_y
+        rnd = bpy.data.scenes[0].render
+        rndx = rnd.resolution_x = select_mat[0]
+        rndy = rnd.resolution_y = select_mat[1]
 
         #orthoscale = ((rndx - rndy)/rndy)+1
         if rndx >= rndy:
@@ -244,14 +294,14 @@ class CameraviewPaint(bpy.types.Operator):
         elif rndx < rndy:
             orthoscale = 1
         context.object.data.ortho_scale = orthoscale
-        context.selectable_objects
+        #context.selectable_objects
 
-        #deselect camera
+        #Init Selection
         bpy.ops.object.select_all(action='TOGGLE')
+        bpy.ops.object.select_all(action='DESELECT')
 
         #select plane
-        bpy.ops.object.select_all(action='DESELECT')
-        ob = bpy.data.objects["canvas"]
+        ob = bpy.data.objects[_obName]
         ob.select = True
         context.scene.objects.active = ob
 
@@ -267,21 +317,19 @@ class CanvasHoriz(bpy.types.Operator):
     bl_label = "Canvas horiz"
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        else:
+            return False
 
     def execute(self, context):
-
-        scene = context.scene
-
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
 
-        #flip canvas horizontal
-        bpy.ops.transform.resize(value=(-1, 1, 1),
-                            constraint_axis=(True, False, False),
-                            constraint_orientation='GLOBAL',
-                            mirror=False, proportional='DISABLED',
-                            proportional_edit_falloff='SMOOTH',
-                            proportional_size=1 )
+        # Horizontal mirror
+        bpy.ops.transform.mirror(constraint_axis=(True, False, False))
 
         #toggle object to texture
         bpy.ops.paint.texture_paint_toggle()
@@ -295,22 +343,19 @@ class CanvasVertical(bpy.types.Operator):
     bl_label = "Canvas Vertical"
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        else:
+            return False
 
     def execute(self, context):
-
-        scene = context.scene
-
         #toggle texture mode/object mode
         bpy.ops.paint.texture_paint_toggle()
 
-        #flip canvas horizontal
-        bpy.ops.transform.resize(value=(1, -1, 1),
-                    constraint_axis=(False, True, False),
-                    constraint_orientation='GLOBAL',
-                    mirror=False,
-                    proportional='DISABLED',
-                    proportional_edit_falloff='SMOOTH',
-                    proportional_size=1)
+        # Vertical mirror
+        bpy.ops.transform.mirror(constraint_axis=(False, True, False))
 
         #toggle texture mode/object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -324,23 +369,22 @@ class RotateCanvasCCW15(bpy.types.Operator):
     bl_label = "Canvas Rotate CounterClockwise 15"
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        else:
+            return False
 
     def execute(self, context):
-
-        scene = context.scene
-
         #toggle texture mode/object mode
         bpy.ops.paint.texture_paint_toggle()
 
         #rotate canvas 15 degrees left
         bpy.ops.transform.rotate(value=0.261799,
                         axis=(0, 0, 1),
-                        constraint_axis=(False, False, True),
-                        constraint_orientation='GLOBAL',
-                        mirror=False,
-                        proportional='DISABLED',
-                        proportional_edit_falloff='SMOOTH',
-                        proportional_size=1)
+                        constraint_axis=(False, False, True))
+        bpy.ops.view3d.camera_to_view_selected()
 
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -354,23 +398,22 @@ class RotateCanvasCW15(bpy.types.Operator):
     bl_label = "Canvas Rotate Clockwise 15"
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        else:
+            return False
 
     def execute(self, context):
-
-        scene = context.scene
-
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
 
         #rotate canvas 15 degrees left
         bpy.ops.transform.rotate(value=-0.261799,
                 axis=(0, 0, 1),
-                constraint_axis=(False, False, True),
-                constraint_orientation='GLOBAL',
-                mirror=False,
-                proportional='DISABLED',
-                proportional_edit_falloff='SMOOTH',
-                proportional_size=1)
+                constraint_axis=(False, False, True))
+        bpy.ops.view3d.camera_to_view_selected()
 
         #toggle texture mode/object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -384,11 +427,14 @@ class RotateCanvasCCW(bpy.types.Operator):
     bl_label = "Canvas Rotate CounterClockwise 90"
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        else:
+            return False
 
     def execute(self, context):
-
-        scene = context.scene
-
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
 
@@ -401,6 +447,7 @@ class RotateCanvasCCW(bpy.types.Operator):
                     proportional='DISABLED',
                     proportional_edit_falloff='SMOOTH',
                     proportional_size=1)
+        bpy.ops.view3d.camera_to_view_selected()
 
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -414,11 +461,14 @@ class RotateCanvasCW(bpy.types.Operator):
     bl_label = "Canvas Rotate Clockwise 90"
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        else:
+            return False
 
     def execute(self, context):
-
-        scene = context.scene
-
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
 
@@ -431,6 +481,7 @@ class RotateCanvasCW(bpy.types.Operator):
                     proportional='DISABLED',
                     proportional_edit_falloff='SMOOTH',
                     proportional_size=1)
+        bpy.ops.view3d.camera_to_view_selected()
 
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -445,12 +496,17 @@ class CanvasResetrot(bpy.types.Operator):
     bl_label = "Canvas Reset Rotation"
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        else:
+            return False
 
     def execute(self, context):
-        scene = context.scene
-
         #reset canvas rotation
         bpy.ops.object.rotation_clear()
+        bpy.ops.view3d.camera_to_view_selected()
         return {'FINISHED'}
 
 
@@ -531,6 +587,8 @@ class ArtistPanel(bpy.types.Panel):
 
 
 def register():
+    bpy.utils.register_class(MessageOperator)
+    bpy.utils.register_class(OkOperator)
     bpy.utils.register_class(ImageReload)
     bpy.utils.register_class(SaveImage)
     bpy.utils.register_class(BrushMakerScene)
@@ -559,6 +617,9 @@ def unregister():
     bpy.utils.unregister_class(BrushMakerScene)
     bpy.utils.unregister_class(SaveImage)
     bpy.utils.unregister_class(ImageReload)
+    bpy.utils.unregister_class(OkOperator)
+    bpy.utils.unregister_class(MessageOperator)
+
 
 if __name__ == "__main__":
     register()
