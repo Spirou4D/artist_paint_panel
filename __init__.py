@@ -1,5 +1,5 @@
 # -*- coding: utf8 -*-
-#
+# python
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
 #  This program is free software; you can redistribute it and/or
@@ -32,6 +32,7 @@ bl_info = {"name": "Paint Artist Panel",
 
 import bpy
 from bpy.props import *
+import os
 
 '''
 Modif: 2016-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -105,17 +106,30 @@ class SaveImage(bpy.types.Operator):
         i = 1
         obj = context.active_object
         _obName = obj.name
-        for ob  in bpy.data.objects:
-            if ob.name == _obName + '_' + '{:03d}'.format(i):
-                i += 1
 
-        _obName = _obName + '_' + '{:03d}'.format(i)
+        filePATH = (obj.data.materials[0].texture_slots[0].\
+                                    texture.image.filepath)[11:]
+        filePATH = os.path.abspath(filePATH)
+
+        _Ext = os.path.splitext(filePATH)[1]
+        _tempName = [ _obName + '_' + '{:03d}'.format(i) + _Ext ]
+        _Dir = os.path.dirname(filePATH)
+        l = os.listdir(_Dir)
+        brushesName = [ f for f in l if os.path.\
+                                isfile(os.path.join(_Dir,f)) ]
+        brushesName = sorted(brushesName)
+
+        #New filePATH
+        for x in _tempName:
+            for ob in brushesName:
+                if ob == _tempName[-1]:
+                    i += 1
+                    _tempName = _tempName + [_obName + '_' + \
+                                    '{:03d}'.format(i) + _Ext]
+
         #return image to last saved state
-        filePATH = obj.data.materials[0].\
-                    texture_slots[0].texture.image.filepath
-        #filePATH = '//../../../../.././brush/Cafeina (26).png'
-        bpy.ops.image.save_as(filepath = filePATH)
-
+        chemin = os.path.join(_Dir,_tempName[-1])
+        bpy.ops.image.save_as(filepath = chemin)
 
         context.area.type = original_type
         return {'FINISHED'}
