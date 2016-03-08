@@ -75,7 +75,7 @@ class OkOperator(bpy.types.Operator):
 #-------------------------------------------------reload image
 class ImageReload(bpy.types.Operator):
     """Reload Image Last Saved State"""
-    bl_idname = "artist_panel.reload_saved_state"
+    bl_idname = "artist_paint.reload_saved_state"
     bl_label = "Reload Image Save Point"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -92,7 +92,7 @@ class ImageReload(bpy.types.Operator):
 #-------------------------------------------------image save
 class SaveImage(bpy.types.Operator):
     """Save Image"""
-    bl_idname = "artist_panel.save_current"
+    bl_idname = "artist_paint.save_current"
     bl_label = "Save Image Current"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -111,7 +111,7 @@ class SaveImage(bpy.types.Operator):
 #-------------------------------------------------image save
 class SaveIncremImage(bpy.types.Operator):
     """Save Image"""
-    bl_idname = "artist_panel.save_increm"
+    bl_idname = "artist_paint.save_increm"
     bl_label = "Save incremential Image Current"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -156,7 +156,7 @@ class SaveIncremImage(bpy.types.Operator):
 #--------------------------------------------------Create brush
 class BrushMakerScene(bpy.types.Operator):
     """Create Brush Scene"""
-    bl_idname = "artist_panel.create_brush_scene"
+    bl_idname = "artist_paint.create_brush_scene"
     bl_label = "Create Scene for Image Brush Maker"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -223,7 +223,7 @@ class BrushMakerScene(bpy.types.Operator):
 #--------------------------------------------------Shaderless
 class CanvasShadeless(bpy.types.Operator):
     """Canvas made shadeless Macro"""
-    bl_idname = "artist_panel.canvas_shadeless"
+    bl_idname = "artist_paint.canvas_shadeless"
     bl_label = "Canvas Shadeless"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -246,7 +246,7 @@ class CanvasShadeless(bpy.types.Operator):
 #-------------------------------------------------cameraview paint
 class CameraviewPaint(bpy.types.Operator):
     """Create a front-of camera in painting mode"""
-    bl_idname = "artist_panel.cameraview_paint"
+    bl_idname = "artist_paint.cameraview_paint"
     bl_label = "Cameraview Paint"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -345,7 +345,7 @@ class CameraviewPaint(bpy.types.Operator):
 #--------------------------------------------------flip  horiz. macro
 class CanvasHoriz(bpy.types.Operator):
     """Canvas Flip Horizontal Macro"""
-    bl_idname = "artist_panel.canvas_horizontal"
+    bl_idname = "artist_paint.canvas_horizontal"
     bl_label = "Canvas horiz"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -372,7 +372,7 @@ class CanvasHoriz(bpy.types.Operator):
 #--------------------------------------------------flip vertical macro
 class CanvasVertical(bpy.types.Operator):
     """Canvas Flip Vertical Macro"""
-    bl_idname = "artist_panel.canvas_vertical"
+    bl_idname = "artist_paint.canvas_vertical"
     bl_label = "Canvas Vertical"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -398,7 +398,7 @@ class CanvasVertical(bpy.types.Operator):
 #-------------------------------------------------ccw15
 class RotateCanvasCCW15(bpy.types.Operator):
     """Image Rotate CounterClockwise 15 Macro"""
-    bl_idname = "artist_panel.rotate_ccw_15"
+    bl_idname = "artist_paint.rotate_ccw_15"
     bl_label = "Canvas Rotate CounterClockwise 15"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -408,6 +408,7 @@ class RotateCanvasCCW15(bpy.types.Operator):
             return context.active_object.type == 'MESH'
         else:
             return False
+
 
     def execute(self, context):
         #init
@@ -443,7 +444,7 @@ class RotateCanvasCCW15(bpy.types.Operator):
 #-------------------------------------------------cw15
 class RotateCanvasCW15(bpy.types.Operator):
     """Image Rotate Clockwise 15 Macro"""
-    bl_idname = "artist_panel.rotate_cw_15"
+    bl_idname = "artist_paint.rotate_cw_15"
     bl_label = "Canvas Rotate Clockwise 15"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -488,7 +489,7 @@ class RotateCanvasCW15(bpy.types.Operator):
 #-------------------------------------------------ccw 90
 class RotateCanvasCCW(bpy.types.Operator):
     """Image Rotate CounterClockwise 90 Macro"""
-    bl_idname = "artist_panel.rotate_ccw_90"
+    bl_idname = "artist_paint.rotate_ccw_90"
     bl_label = "Canvas Rotate CounterClockwise 90"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -522,7 +523,7 @@ class RotateCanvasCCW(bpy.types.Operator):
 #-------------------------------------------------cw 90
 class RotateCanvasCW(bpy.types.Operator):
     """Image Rotate Clockwise 90 Macro"""
-    bl_idname = "artist_panel.rotate_cw_90"
+    bl_idname = "artist_paint.rotate_cw_90"
     bl_label = "Canvas Rotate Clockwise 90"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -557,7 +558,7 @@ class RotateCanvasCW(bpy.types.Operator):
 #-------------------------------------------------image rotation reset
 class CanvasResetrot(bpy.types.Operator):
     """Canvas Rotation Reset Macro"""
-    bl_idname = "artist_panel.canvas_resetrot"
+    bl_idname = "artist_paint.canvas_resetrot"
     bl_label = "Canvas Reset Rotation"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -663,7 +664,7 @@ class CloseCurveunwrap(bpy.types.Operator):
 #------------------------------------------------------Gpencil to Mask in one step
 class TraceSelection(bpy.types.Operator):
     """Convert gpencil to CURVE"""
-    bl_idname = "artist_panel.trace_selection"
+    bl_idname = "artist_paint.trace_selection"
 
 
     bl_label = "Convert Gpencil to Mask and UV Project"
@@ -732,19 +733,19 @@ class ArtistPanel(bpy.types.Panel):
         col = box.column(align = True)
         col.operator("import_image.to_plane",
                     text = "Import Image as plane", icon = 'IMAGE_COL')
-        col.operator("artist_panel.reload_saved_state",
+        col.operator("artist_paint.reload_saved_state",
                     text = "Reload Image", icon = 'LOAD_FACTORY')
         col.operator("render.opengl", \
                     text = "OpenGL Render", icon = 'RENDER_STILL')
 
         row = col.row(align = True)
-        row.operator("artist_panel.save_current",
+        row.operator("artist_paint.save_current",
                     text = "Save/Overwrite", icon = 'IMAGEFILE')
-        row.operator("artist_panel.save_increm",
+        row.operator("artist_paint.save_increm",
                     text = "Incremental Save", icon = 'SAVE_COPY')
 
         col.label(text='') #empty line
-        col.operator("artist_panel.create_brush_scene",
+        col.operator("artist_paint.create_brush_scene",
                 text="Create Brush Maker Scene",
                 icon='OUTLINER_OB_CAMERA')
 
@@ -753,9 +754,9 @@ class ArtistPanel(bpy.types.Panel):
         col = box.column(align = True)
         col.label(text="Special Macros")
         row = col.row(align = True)
-        row.operator("artist_panel.canvas_shadeless",
+        row.operator("artist_paint.canvas_shadeless",
                     text = "Shadeless Canvas", icon = 'FORCE_TEXTURE')
-        row.operator("artist_panel.cameraview_paint",
+        row.operator("artist_paint.cameraview_paint",
                     text = "Add Painting Camera",
                     icon = 'RENDER_REGION')
 
@@ -771,7 +772,7 @@ class ArtistPanel(bpy.types.Panel):
                     text = "B. Close Mask & Unwrap",
                     icon = 'CURVE_NCIRCLE')
 
-        col.operator("artist_panel.trace_selection",
+        col.operator("artist_paint.trace_selection",
                     text = "Mask from Gpencil",
                     icon = 'CURVE_BEZCIRCLE')
 
@@ -792,10 +793,10 @@ class ArtistPanel(bpy.types.Panel):
         col = box.column(align = True)
         col.label(text="Mirror")                #MIRROR FLIP
         row = col.row(align = True)
-        row.operator("artist_panel.canvas_horizontal",
+        row.operator("artist_paint.canvas_horizontal",
                     text="Canvas Flip Horizontal",
                     icon='ARROW_LEFTRIGHT')
-        row.operator("artist_panel.canvas_vertical",
+        row.operator("artist_paint.canvas_vertical",
                     text = "Canvas Flip Vertical",
                     icon = 'FILE_PARENT')
 
@@ -803,18 +804,18 @@ class ArtistPanel(bpy.types.Panel):
         row.label(text="Rotation")              #ROTATION
 
         row = col.row(align = True)
-        row.operator("artist_panel.rotate_ccw_15",
+        row.operator("artist_paint.rotate_ccw_15",
                     text = "Rotate 15° CCW", icon = 'TRIA_LEFT')
-        row.operator("artist_panel.rotate_cw_15",
+        row.operator("artist_paint.rotate_cw_15",
                     text = "Rotate 15° CW", icon = 'TRIA_RIGHT')
 
         row = col.row(align = True)
-        row.operator("artist_panel.rotate_ccw_90",
+        row.operator("artist_paint.rotate_ccw_90",
                     text = "Rotate 90° CCW", icon = 'PREV_KEYFRAME')
-        row.operator("artist_panel.rotate_cw_90",
+        row.operator("artist_paint.rotate_cw_90",
                     text = "Rotate 90° CW", icon = 'NEXT_KEYFRAME')
 
-        col.operator("artist_panel.canvas_resetrot",
+        col.operator("artist_paint.canvas_resetrot",
                     text = "Reset Rotation", icon = 'CANCEL')
 
 
