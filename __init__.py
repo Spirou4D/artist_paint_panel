@@ -827,7 +827,7 @@ class ArtistPanel(bpy.types.Panel):
                     text = "Mask from Gpencil",
                     icon = 'CURVE_BEZCIRCLE')
 
-        col.label(text="") # empty line
+        col.separator() # empty line
 
         row = col.row(align = True)
         row.operator("artist_paint.curve_2dpoly",
@@ -838,7 +838,7 @@ class ArtistPanel(bpy.types.Panel):
                     icon = 'CURVE_NCIRCLE')
 
 
-        col.label(text="") # empty line
+        col.separator() # empty line
 
         col.prop(ipaint, "use_stencil_layer", text="Stencil Mask")
         if ipaint.use_stencil_layer == True:
