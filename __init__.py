@@ -710,19 +710,6 @@ class RotateCanvasCCW(bpy.types.Operator):
                                 proportional_size=1)
         bpy.ops.view3d.camera_to_view_selected()
 
-        for cam  in bpy.data.objects:
-            if cam.name == _camName:
-                cam.select = True
-                context.scene.objects.active = cam
-
-        context.object.data.ortho_scale = camRatio
-
-        context.object.data.show_guide = {'CENTER',
-                            'CENTER_DIAGONAL', 'THIRDS', 'GOLDEN',
-                            'GOLDEN_TRIANGLE_A', 'GOLDEN_TRIANGLE_B',
-                            'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'
-                            }
-
         #Init Selection
         bpy.ops.object.select_all(action='TOGGLE')
         bpy.ops.object.select_all(action='DESELECT')
@@ -786,18 +773,6 @@ class RotateCanvasCW(bpy.types.Operator):
                     proportional_edit_falloff='SMOOTH',
                     proportional_size=1)
         bpy.ops.view3d.camera_to_view_selected()
-
-        for cam  in bpy.data.objects:
-            if cam.name == _camName:
-                cam.select = True
-                context.scene.objects.active = cam
-        context.object.data.ortho_scale = camRatio
-
-        context.object.data.show_guide = {'CENTER',
-                            'CENTER_DIAGONAL', 'THIRDS', 'GOLDEN',
-                            'GOLDEN_TRIANGLE_A', 'GOLDEN_TRIANGLE_B',
-                            'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'
-                            }
 
         #Init Selection
         bpy.ops.object.select_all(action='TOGGLE')
