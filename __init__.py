@@ -30,16 +30,45 @@ bl_info = {"name": "Paint Artist Panel",
            "warning": "Run only in BI now",
            "category": "Paint"}
 
-import bpy
-from bpy.props import *
-import os
-
 '''
 Modif: 2016-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 Modif: 2016-02'01 Patrick optimize the code
 '''
 
+import bpy
+from bpy.props import *
+import os
+import math
 
+
+########################
+#      Properties      #
+########################
+
+class ArtistPaintPanelPrefs(bpy.types.AddonPreferences):
+    """Creates the 3D view > TOOLS > Artist Paint Panel"""
+    bl_idname = __name__
+    bl_options = {'REGISTER'}
+
+    bpy.types.Scene.Enable_Tab_APP_01 = bpy.props.\
+                                        BoolProperty(default=False)
+    bpy.types.Scene.CustomAngle = bpy.props.FloatProperty(default=15.0)
+
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(context.scene, "CustomAngle", text="Custom angle of rotation")
+
+        if context.scene.Enable_Tab_APP_01:
+            row = layout.row()
+            layout.label(text="– shortcuts _")
+
+
+
+#######################
+#       Classes       #
+#######################
 #----------------------------------------------Display message
 class MessageOperator(bpy.types.Operator):
     bl_idname = "error.message"
@@ -398,8 +427,9 @@ class CanvasVertical(bpy.types.Operator):
 #-------------------------------------------------ccw15
 class RotateCanvasCCW15(bpy.types.Operator):
     """Image Rotate CounterClockwise 15 Macro"""
+    bl_description = "Rotate from prefs. custom angle, default=15°."
     bl_idname = "artist_paint.rotate_ccw_15"
-    bl_label = "Canvas Rotate CounterClockwise 15"
+    bl_label = "Canvas Rotate CounterClockwise 15°"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -411,6 +441,7 @@ class RotateCanvasCCW15(bpy.types.Operator):
 
 
     def execute(self, context):
+        CustomAngle = math.radians(context.scene.CustomAngle)
         #init
         obj = context.active_object
         _obName = obj.name
@@ -420,7 +451,7 @@ class RotateCanvasCCW15(bpy.types.Operator):
         bpy.ops.paint.texture_paint_toggle()
 
         #rotate canvas 15 degrees left
-        bpy.ops.transform.rotate(value=0.261799,
+        bpy.ops.transform.rotate(value=CustomAngle,
                         axis=(0, 0, 1),
                         constraint_axis=(False, False, True))
         bpy.ops.view3d.camera_to_view_selected()
@@ -444,8 +475,9 @@ class RotateCanvasCCW15(bpy.types.Operator):
 #-------------------------------------------------cw15
 class RotateCanvasCW15(bpy.types.Operator):
     """Image Rotate Clockwise 15 Macro"""
+    bl_description = "Rotate from prefs. custom angle, default=15°."
     bl_idname = "artist_paint.rotate_cw_15"
-    bl_label = "Canvas Rotate Clockwise 15"
+    bl_label = "Canvas Rotate Clockwise 15°"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -456,6 +488,7 @@ class RotateCanvasCW15(bpy.types.Operator):
             return False
 
     def execute(self, context):
+        CustomAngle = math.radians(context.scene.CustomAngle)
         #init
         obj = context.active_object
         _obName = obj.name
@@ -465,7 +498,7 @@ class RotateCanvasCW15(bpy.types.Operator):
         bpy.ops.paint.texture_paint_toggle()
 
         #rotate canvas 15 degrees left
-        bpy.ops.transform.rotate(value=-0.261799,
+        bpy.ops.transform.rotate(value=-CustomAngle,
                 axis=(0, 0, 1),
                 constraint_axis=(False, False, True))
         bpy.ops.view3d.camera_to_view_selected()
@@ -723,6 +756,8 @@ class ArtistPanel(bpy.types.Panel):
         return bpy.context.scene.render.engine == 'BLENDER_RENDER'
 
     def draw(self, context):
+        _strAngle = str(context.scene.CustomAngle)
+
         layout = self.layout
         toolsettings = context.tool_settings
         ipaint = context.tool_settings.image_paint
@@ -804,10 +839,12 @@ class ArtistPanel(bpy.types.Panel):
         row.label(text="Rotation")              #ROTATION
 
         row = col.row(align = True)
+        buttName_1 = "Rotate " +_strAngle+"° CCW"
+        buttName_2 = "-"+buttName_1
         row.operator("artist_paint.rotate_ccw_15",
-                    text = "Rotate 15° CCW", icon = 'TRIA_LEFT')
+                    text = buttName_1, icon = 'TRIA_LEFT')
         row.operator("artist_paint.rotate_cw_15",
-                    text = "Rotate 15° CW", icon = 'TRIA_RIGHT')
+                    text = buttName_2, icon = 'TRIA_RIGHT')
 
         row = col.row(align = True)
         row.operator("artist_paint.rotate_ccw_90",
