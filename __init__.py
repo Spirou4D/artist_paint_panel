@@ -322,10 +322,9 @@ class CameraviewPaint(bpy.types.Operator):
         obj = context.active_object
         _obName = obj.name
         _camName = "Camera_" + _obName
-
         #http://blender.stackexchange.com/users/660/mutant-bob
         select_mat = obj.data.materials[0].texture_slots[0].\
-                    texture.image.size[:]
+                                            texture.image.size[:]
 
         for cam  in bpy.data.objects:
             if cam.name == _camName:
@@ -474,6 +473,7 @@ class CurvePoly2d(bpy.types.Operator):
         #change to 2d
         bpy.context.object.data.dimensions = '2D'
         return {'FINISHED'}
+
 
 #-----------------------------------------------close, mesh and unwrap
 class CloseCurveunwrap(bpy.types.Operator):
@@ -672,19 +672,65 @@ class RotateCanvasCCW(bpy.types.Operator):
         return False
 
     def execute(self, context):
+        #init
+        obj = context.active_object
+        _obName = obj.name
+        _camName = "Camera_" + _obName
+        #http://blender.stackexchange.com/users/660/mutant-bob
+        select_mat = obj.data.materials[0].texture_slots[0].\
+                                            texture.image.size[:]
+        if select_mat[0] >= select_mat[1]:
+            camRatio = select_mat[0]/select_mat[1]
+        else:
+            camRatio = select_mat[1]/select_mat[0]
+        #(988, 761) X select_mat[0] Y select_mat[1]
+
+        #resolution
+        rnd = context.scene.render
+        if rnd.resolution_x==select_mat[0]:
+            rnd.resolution_x= select_mat[1]
+            rnd.resolution_y= select_mat[0]
+        elif rnd.resolution_x==select_mat[1]:
+            rnd.resolution_x= select_mat[0]
+            rnd.resolution_y= select_mat[1]
+
+
+
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
 
         #rotate canvas 90 degrees left
         bpy.ops.transform.rotate(value=1.5708,
-                    axis=(0, 0, 1),
-                    constraint_axis=(False, False, True),
-                    constraint_orientation='GLOBAL',
-                    mirror=False,
-                    proportional='DISABLED',
-                    proportional_edit_falloff='SMOOTH',
-                    proportional_size=1)
+                                axis=(0, 0, 1),
+                                constraint_axis=(False, False, True),
+                                constraint_orientation='GLOBAL',
+                                mirror=False,
+                                proportional='DISABLED',
+                                proportional_edit_falloff='SMOOTH',
+                                proportional_size=1)
         bpy.ops.view3d.camera_to_view_selected()
+
+        for cam  in bpy.data.objects:
+            if cam.name == _camName:
+                cam.select = True
+                context.scene.objects.active = cam
+
+        context.object.data.ortho_scale = camRatio
+
+        context.object.data.show_guide = {'CENTER',
+                            'CENTER_DIAGONAL', 'THIRDS', 'GOLDEN',
+                            'GOLDEN_TRIANGLE_A', 'GOLDEN_TRIANGLE_B',
+                            'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'
+                            }
+
+        #Init Selection
+        bpy.ops.object.select_all(action='TOGGLE')
+        bpy.ops.object.select_all(action='DESELECT')
+
+        #select plane
+        ob = bpy.data.objects[_obName]
+        ob.select = True
+        context.scene.objects.active = ob
 
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -705,6 +751,28 @@ class RotateCanvasCW(bpy.types.Operator):
         return False
 
     def execute(self, context):
+        #init
+        obj = context.active_object
+        _obName = obj.name
+        _camName = "Camera_" + _obName
+        #http://blender.stackexchange.com/users/660/mutant-bob
+        select_mat = obj.data.materials[0].texture_slots[0].\
+                                            texture.image.size[:]
+        if select_mat[0] >= select_mat[1]:
+            camRatio = select_mat[0]/select_mat[1]
+        else:
+            camRatio = select_mat[1]/select_mat[0]
+        #(988, 761) X select_mat[0] Y select_mat[1]
+
+        #resolution
+        rnd = context.scene.render
+        if rnd.resolution_x==select_mat[0]:
+            rnd.resolution_x= select_mat[1]
+            rnd.resolution_y= select_mat[0]
+        elif rnd.resolution_x==select_mat[1]:
+            rnd.resolution_x= select_mat[0]
+            rnd.resolution_y= select_mat[1]
+
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
 
@@ -718,6 +786,27 @@ class RotateCanvasCW(bpy.types.Operator):
                     proportional_edit_falloff='SMOOTH',
                     proportional_size=1)
         bpy.ops.view3d.camera_to_view_selected()
+
+        for cam  in bpy.data.objects:
+            if cam.name == _camName:
+                cam.select = True
+                context.scene.objects.active = cam
+        context.object.data.ortho_scale = camRatio
+
+        context.object.data.show_guide = {'CENTER',
+                            'CENTER_DIAGONAL', 'THIRDS', 'GOLDEN',
+                            'GOLDEN_TRIANGLE_A', 'GOLDEN_TRIANGLE_B',
+                            'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'
+                            }
+
+        #Init Selection
+        bpy.ops.object.select_all(action='TOGGLE')
+        bpy.ops.object.select_all(action='DESELECT')
+
+        #select plane
+        ob = bpy.data.objects[_obName]
+        ob.select = True
+        context.scene.objects.active = ob
 
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -742,6 +831,22 @@ class CanvasResetrot(bpy.types.Operator):
         obj = context.active_object
         _obName = obj.name
         _camName = "Camera_" + _obName
+        #http://blender.stackexchange.com/users/660/mutant-bob
+        #(988, 761) X select_mat[0] Y select_mat[1]
+        select_mat = obj.data.materials[0].texture_slots[0].\
+                                            texture.image.size[:]
+        print(str(select_mat[0]))
+        print(str(select_mat[1]))
+
+        if select_mat[0] >= select_mat[1]:
+            camRatio = select_mat[0]/select_mat[1]
+        else:
+            camRatio = select_mat[1]/select_mat[0]
+
+        #resolution
+        rnd = context.scene.render
+        rnd.resolution_x= select_mat[0]
+        rnd.resolution_y= select_mat[1]
 
         #reset canvas rotation
         bpy.ops.object.rotation_clear()
@@ -751,11 +856,13 @@ class CanvasResetrot(bpy.types.Operator):
             if cam.name == _camName:
                 cam.select = True
                 context.scene.objects.active = cam
-                #activate on composition guides
-                context.object.data.show_guide = {'CENTER',
-                            'CENTER_DIAGONAL', 'THIRDS', 'GOLDEN',
-                            'GOLDEN_TRIANGLE_A', 'GOLDEN_TRIANGLE_B',
-                            'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'}
+        context.object.data.ortho_scale = camRatio
+
+        #activate on composition guides
+        context.object.data.show_guide = {'CENTER',
+                    'CENTER_DIAGONAL', 'THIRDS', 'GOLDEN',
+                    'GOLDEN_TRIANGLE_A', 'GOLDEN_TRIANGLE_B',
+                    'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'}
 
         bpy.ops.object.select_all(action='DESELECT')
         ob = bpy.data.objects[_obName]
