@@ -411,41 +411,69 @@ class CameraviewPaint(bpy.types.Operator):
 #-------------------------------------------Gpencil to Mask in one step
 class TraceSelection(bpy.types.Operator):
     """Convert gpencil to CURVE"""
-    bl_description = "Convert Gpencil sketch into Mask"
     bl_idname = "artist_paint.trace_selection"
-    bl_label = "Convert Gpencil to Mask and UV Project"
-    bl_options = { 'REGISTER', 'UNDO' }
-
+    bl_label = "Setup Mirror Canvas"
+    bl_options = {'REGISTER', 'UNDO'}
+    '''
+    @classmethod
+    def poll(self, context):
+        if context.active_object is not None:
+            return context.active_object.type == 'MESH'
+        return False
+    '''
     def execute(self, context):
+        scene = context.scene
+        tool_settings = scene.tool_settings
+        obj = context.object                 #select canvas object
+        objProp = bpy.ops.object
+
         bpy.ops.gpencil.convert(type='CURVE', use_timing_data=True)
         bpy.ops.gpencil.data_unlink()
 
-        bpy.ops.object.select_by_type(type = 'CURVE')
-        bpy.context.scene.objects.active = bpy.data.objects["GP_Layer"]
+        bpy.ops.paint.texture_paint_toggle()    #return object mode
+        objProp.select_by_type(type = 'CURVE')
+        lrs = []
+        for lay in bpy.data.objects:
+            if lay.name.find('GP_Layer') != -1:
+                lrs.append(lay)
+        cv = lrs[-1]
+        context.scene.objects.active = cv
+        objProp.origin_set(type='ORIGIN_GEOMETRY')
 
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
+        objProp.editmode_toggle()                 #return edit mode
+        cvProp = bpy.ops.curve
+        cvProp.cyclic_toggle()     #return curve object mode
+        cv.data.dimensions = '2D'
 
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.curve.cyclic_toggle()
-        bpy.context.object.data.dimensions = '2D'
+        objProp.editmode_toggle()               #return object mode
+        objProp.convert(target='MESH')
 
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.object.convert(target='MESH')
-        bpy.ops.object.editmode_toggle()
+        objProp.editmode_toggle()                 #return edit mode
         bpy.ops.mesh.select_all(action='TOGGLE')
-
         bpy.ops.mesh.dissolve_faces()
+        bpy.ops.uv.project_from_view(camera_bounds=True,
+                                        correct_aspect=False,
+                                        scale_to_bounds=False)
+        #Add a material+texture diffuse
+        mat = bpy.data.materials.new("default")
+        cv.data.materials.append(mat)
+        cv.active_material.use_shadeless = True
 
-        bpy.ops.uv.project_from_view(camera_bounds=True,\
-                        correct_aspect=False, scale_to_bounds=False)
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.paint.texture_paint_toggle()
-        bpy.context.scene.tool_settings.image_paint.use_occlude = False
-        bpy.context.scene.tool_settings.image_paint.\
-                                        use_backface_culling = False
-        bpy.context.scene.tool_settings.image_paint.\
-                                            use_normal_falloff = False
-        bpy.context.scene.tool_settings.image_paint.seam_bleed = 0
+        #select canvas
+        obj.select = True
+        context.scene.objects.active = obj
+
+        #layer parent to canvas
+        bpy.ops.object.parent_set(type='OBJECT',
+                                    xmirror=False,
+                                    keep_transform=False)
+
+        objProp.editmode_toggle()               #return object mode
+        bpy.ops.paint.texture_paint_toggle()     #return paint mode
+        tool_settings.image_paint.use_occlude = False
+        tool_settings.image_paint.use_backface_culling = False
+        tool_settings.image_paint.use_normal_falloff = False
+        tool_settings.image_paint.seam_bleed = 0
         return {'FINISHED'}
 
 
@@ -603,7 +631,7 @@ class RotateCanvasCCW15(bpy.types.Operator):
             if cam.name == _camName:
                 cam.select = True
                 context.scene.objects.active = cam
-        context.object.data.show_guide = set()
+
 
         bpy.ops.object.select_all(action='DESELECT')
         ob = bpy.data.objects[_obName]
@@ -651,7 +679,7 @@ class RotateCanvasCW15(bpy.types.Operator):
             if cam.name == _camName:
                 cam.select = True
                 context.scene.objects.active = cam
-        context.object.data.show_guide = set()
+
 
         bpy.ops.object.select_all(action='DESELECT')
         ob = bpy.data.objects[_obName]
