@@ -36,6 +36,12 @@ Modif: 2016-02'01 Patrick optimize the code
 '''
 
 import bpy
+from bpy.types import   AddonPreferences,\
+                        Menu,\
+                        Panel,\
+                        UIList,\
+                        Operator
+
 from bpy.props import *
 import os
 import math
@@ -45,7 +51,7 @@ SEP = os.sep
 #      Properties      #
 ########################
 
-class ArtistPaintPanelPrefs(bpy.types.AddonPreferences):
+class ArtistPaintPanelPrefs(AddonPreferences):
     """Creates the 3D view > TOOLS > Artist Paint Panel"""
     bl_idname = __name__
     bl_options = {'REGISTER'}
@@ -57,10 +63,8 @@ class ArtistPaintPanelPrefs(bpy.types.AddonPreferences):
 
     def draw(self, context):
         layout = self.layout
-
         layout.prop(context.scene, "CustomAngle",\
                                     text="Custom angle of rotation")
-
         if context.scene.Enable_Tab_APP_01:
             row = layout.row()
             layout.label(text="– shortcuts _")
@@ -71,10 +75,10 @@ class ArtistPaintPanelPrefs(bpy.types.AddonPreferences):
 #       UI Tools       #
 #######################
 #----------------------------------------------Display message
-class MessageOperator(bpy.types.Operator):
+class MessageOperator(Operator):
     bl_idname = "error.message"
     bl_label = "Message"
-    type = StringProperty()
+
     message = StringProperty()
 
     def execute(self, context):
@@ -94,7 +98,7 @@ class MessageOperator(bpy.types.Operator):
         row = layout.row()
 
 #-----------------------------The OK button in the error dialog
-class OkOperator(bpy.types.Operator):
+class OkOperator(Operator):
     bl_idname = "error.ok"
     bl_label = "OK"
     def execute(self, context):
@@ -106,7 +110,7 @@ class OkOperator(bpy.types.Operator):
 #       Classes       #
 #######################
 #-------------------------------------------------reload image
-class ImageReload(bpy.types.Operator):
+class ImageReload(Operator):
     """Reload Image Last Saved State"""
     bl_description = "Reload canvas's image"
     bl_idname = "artist_paint.reload_saved_state"
@@ -122,14 +126,12 @@ class ImageReload(bpy.types.Operator):
     def execute(self, context):
         original_type = context.area.type
         context.area.type = 'IMAGE_EDITOR'
-
-        #return image to last saved state
-        bpy.ops.image.reload()
+        bpy.ops.image.reload()       #return image to last saved state
         context.area.type = original_type
         return {'FINISHED'}
 
 #-------------------------------------------------image save
-class SaveImage(bpy.types.Operator):
+class SaveImage(Operator):
     """Save Image"""
     bl_description = ""
     bl_idname = "artist_paint.save_current"
@@ -145,16 +147,13 @@ class SaveImage(bpy.types.Operator):
     def execute(self, context):
         original_type = context.area.type
         context.area.type = 'IMAGE_EDITOR'
-
-        #save as
-        bpy.ops.image.save_as()
-
+        bpy.ops.image.save_as()                      #save as
         context.area.type = original_type
         return {'FINISHED'}
 
 
 #-------------------------------------------------image save
-class SaveIncremImage(bpy.types.Operator):
+class SaveIncremImage(Operator):
     """Save Image"""
     bl_description = ""
     bl_idname = "artist_paint.save_increm"
@@ -208,7 +207,7 @@ class SaveIncremImage(bpy.types.Operator):
 
 
 #--------------------------------------------------Create brush
-class BrushMakerScene(bpy.types.Operator):
+class BrushMakerScene(Operator):
     """Create Brush Scene"""
     bl_description = ""
     bl_idname = "artist_paint.create_brush_scene"
@@ -230,14 +229,10 @@ class BrushMakerScene(bpy.types.Operator):
         for sc in bpy.data.scenes:
             if sc.name == "Brush":
                 return {'FINISHED'}
-
-        #add new scene and name it 'Brush'
-        bpy.ops.scene.new(type='NEW')
+        bpy.ops.scene.new(type='NEW') #add new scene & name it 'Brush'
         context.scene.name = _name
 
         #add lamp and move up 4 units in z
-        # you can sort elements like this if the code
-        # is gettings long
         bpy.ops.object.lamp_add(
                     type = 'POINT',
                     radius = 1,
@@ -253,8 +248,7 @@ class BrushMakerScene(bpy.types.Operator):
                     rotation=(0, 0, 0)
                     )
 
-        #rename selected camera
-        context.object.name="Tex Camera"
+        context.object.name="Tex Camera"      #rename selected camera
 
         #change scene size to 1K
         _RenderScene = context.scene.render
@@ -275,8 +269,8 @@ class BrushMakerScene(bpy.types.Operator):
         return {'FINISHED'}
 
 
-#--------------------------------------------------Shaderless
-class CanvasShadeless(bpy.types.Operator):
+#-------------------------------------------------     -Shaderless
+class CanvasShadeless(Operator):
     """Canvas made shadeless Macro"""
     bl_description = ""
     bl_idname = "artist_paint.canvas_shadeless"
@@ -290,22 +284,15 @@ class CanvasShadeless(bpy.types.Operator):
         return False
 
     def execute(self, context):
-        #texture draw mode
-        context.space_data.viewport_shade = 'TEXTURED'
-
-        #shadeless material
-        context.object.active_material.use_shadeless = True
-
-        #change to local view
-        bpy.ops.view3d.localview()
-
-        #change to Texture Paint
-        bpy.ops.paint.texture_paint_toggle()
+        context.space_data.viewport_shade = 'TEXTURED'  #texture draw
+        context.object.active_material.use_shadeless = True #shadeless
+        bpy.ops.view3d.localview()             #change to local view
+        bpy.ops.paint.texture_paint_toggle()   #change to Texture Paint
         return {'FINISHED'}
 
 
 #-------------------------------------------------cameraview paint
-class CameraviewPaint(bpy.types.Operator):
+class CameraviewPaint(Operator):
     """Create a front-of camera in painting mode"""
     bl_description = ""
     bl_idname = "artist_paint.cameraview_paint"
@@ -409,18 +396,18 @@ class CameraviewPaint(bpy.types.Operator):
 
 
 #-------------------------------------------Gpencil to Mask in one step
-class TraceSelection(bpy.types.Operator):
+class TraceSelection(Operator):
     """Convert gpencil to CURVE"""
     bl_idname = "artist_paint.trace_selection"
     bl_label = "Setup Mirror Canvas"
     bl_options = {'REGISTER', 'UNDO'}
-    '''
+
     @classmethod
     def poll(self, context):
         if context.active_object is not None:
             return context.active_object.type == 'MESH'
         return False
-    '''
+
     def execute(self, context):
         scene = context.scene
         tool_settings = scene.tool_settings
@@ -477,8 +464,38 @@ class TraceSelection(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class CurvePolyinvert(Operator):
+    """Inverte Mesh Mask"""
+    bl_idname = "artist_paint.inverted_mask"
+    bl_label = "Inverted Mask"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        if context.active_object:
+            return context.active_object.type == 'MESH'
+        return False
+
+    def execute(self, context):
+        scene = context.scene
+        bpy.ops.object.select_by_type(type = 'MESH')
+        bpy.ops.object.duplicate_move()                        #dup
+        bpy.ops.object.convert(target='CURVE')
+        context.object.data.dimensions = '2D'
+        bpy.ops.object.join()
+        bpy.ops.object.convert(target='MESH')
+
+        bpy.ops.object.editmode_toggle()             #toggle edit mode
+        bpy.ops.mesh.select_all(action='TOGGLE')      #select all faces
+        bpy.ops.uv.project_from_view()        #uv unwrap -> camera view
+
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.paint.texture_paint_toggle()
+        return {'FINISHED'}
+
+
 #-----------------------------------------------Curve Bezier to Poly
-class CurvePoly2d(bpy.types.Operator):
+class CurvePoly2d(Operator):
     """Curve added and made poly 2d Macro"""
     bl_description = "Create Bezier2Poly Curve"
     bl_idname = "artist_paint.curve_2dpoly"
@@ -505,7 +522,7 @@ class CurvePoly2d(bpy.types.Operator):
 
 
 #-----------------------------------------------close, mesh and unwrap
-class CloseCurveunwrap(bpy.types.Operator):
+class CloseCurveunwrap(Operator):
     """Close the curve, set to mesh and unwrap"""
     bl_description = "Close, mesh and unwrap"
     bl_idname = "artist_paint.curve_unwrap"
@@ -544,7 +561,7 @@ class CloseCurveunwrap(bpy.types.Operator):
 
 
 #--------------------------------------------------flip  horiz. macro
-class CanvasHoriz(bpy.types.Operator):
+class CanvasHoriz(Operator):
     """Canvas Flip Horizontal Macro"""
     bl_idname = "artist_paint.canvas_horizontal"
     bl_label = "Canvas horiz"
@@ -570,7 +587,7 @@ class CanvasHoriz(bpy.types.Operator):
 
 
 #--------------------------------------------------flip vertical macro
-class CanvasVertical(bpy.types.Operator):
+class CanvasVertical(Operator):
     """Canvas Flip Vertical Macro"""
     bl_idname = "artist_paint.canvas_vertical"
     bl_label = "Canvas Vertical"
@@ -595,7 +612,7 @@ class CanvasVertical(bpy.types.Operator):
 
 
 #-------------------------------------------------ccw15
-class RotateCanvasCCW15(bpy.types.Operator):
+class RotateCanvasCCW15(Operator):
     """Image Rotate CounterClockwise 15 Macro"""
     bl_description = "Rotate from prefs. custom angle, default=15°."
     bl_idname = "artist_paint.rotate_ccw_15"
@@ -644,7 +661,7 @@ class RotateCanvasCCW15(bpy.types.Operator):
 
 
 #-------------------------------------------------cw15
-class RotateCanvasCW15(bpy.types.Operator):
+class RotateCanvasCW15(Operator):
     """Image Rotate Clockwise 15 Macro"""
     bl_description = "Rotate from prefs. custom angle, default=15°."
     bl_idname = "artist_paint.rotate_cw_15"
@@ -692,7 +709,7 @@ class RotateCanvasCW15(bpy.types.Operator):
 
 
 #-------------------------------------------------ccw 90
-class RotateCanvasCCW(bpy.types.Operator):
+class RotateCanvasCCW(Operator):
     """Image Rotate CounterClockwise 90 Macro"""
     bl_idname = "artist_paint.rotate_ccw_90"
     bl_label = "Canvas Rotate CounterClockwise 90"
@@ -758,7 +775,7 @@ class RotateCanvasCCW(bpy.types.Operator):
 
 
 #-------------------------------------------------cw 90
-class RotateCanvasCW(bpy.types.Operator):
+class RotateCanvasCW(Operator):
     """Image Rotate Clockwise 90 Macro"""
     bl_idname = "artist_paint.rotate_cw_90"
     bl_label = "Canvas Rotate Clockwise 90"
@@ -824,7 +841,7 @@ class RotateCanvasCW(bpy.types.Operator):
 
 
 #-------------------------------------------------image rotation reset
-class CanvasResetrot(bpy.types.Operator):
+class CanvasResetrot(Operator):
     """Canvas Rotation Reset Macro"""
     bl_idname = "artist_paint.canvas_resetrot"
     bl_label = "Canvas Reset Rotation"
@@ -883,7 +900,7 @@ class CanvasResetrot(bpy.types.Operator):
 
 
 ##############################################################  panel
-class ArtistPanel(bpy.types.Panel):
+class ArtistPanel(Panel):
     """A custom panel in the viewport toolbar"""
     bl_label = "Artist Panel"
     bl_space_type = 'VIEW_3D'
@@ -947,6 +964,12 @@ class ArtistPanel(bpy.types.Panel):
 
         col.separator() # empty line
 
+        col.operator("artist_paint.inverted_mask",
+                    text = "Mask Inversion",
+                    icon = 'MOD_TRIANGULATE')
+
+        col.separator() # empty line
+
         row = col.row(align = True)
         row.operator("artist_paint.curve_2dpoly",
                     text = "A. 2D Mask Maker",
@@ -954,7 +977,6 @@ class ArtistPanel(bpy.types.Panel):
         row.operator("artist_paint.curve_unwrap",
                     text = "B. Close Mask & Unwrap",
                     icon = 'CURVE_NCIRCLE')
-
 
         col.separator() # empty line
 
