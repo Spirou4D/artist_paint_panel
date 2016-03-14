@@ -41,6 +41,7 @@ from bpy.types import   AddonPreferences,\
                         Panel,\
                         UIList,\
                         Operator
+from bpy.props import *
 import math
 import os
 SEP = os.sep
@@ -391,7 +392,7 @@ class CameraviewPaint(Operator):
 
 #-------------------------------------------Gpencil to Mask in one step
 class TraceSelection(Operator):
-    """Convert gpencil to CURVE"""
+    """Convert gpencil to mesh"""
     bl_idname = "artist_paint.trace_selection"
     bl_label = "Make Mesh Mask from Gpencil's drawing"
     bl_options = {'REGISTER','UNDO'}
@@ -464,7 +465,10 @@ class CurvePoly2d(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        if obj is not None:
+            A = obj.mode == 'TEXTURE_PAINT'
+            B = obj.type == 'MESH'
+            return A and B
 
     def execute(self, context):
         obj = context.object                   #select canvas object
@@ -504,7 +508,10 @@ class CloseCurveunwrap(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'CURVE' #Must add edit mode condition!
+        if obj is not None:
+            A = obj.mode == 'EDIT'
+            B = obj.type == 'CURVE'
+            return A and B
 
     def execute(self, context):
         cv = context.object
@@ -535,41 +542,37 @@ class CloseCurveunwrap(Operator):
 
 #-------------------------------------------Invert all mesh mask
 class CurvePolyinvert(Operator):
-    """Inverte Mesh Mask"""
+    """Inverte Mesh Mask in Object mode only"""
     bl_idname = "artist_paint.inverted_mask"
-    bl_label = "Inverted Mask"
+    bl_description = "Inverte Mesh Mask in Object mode only"
+    bl_label = "Inverte Mesh Mask"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        if obj is not None:
+            A = obj.mode=='OBJECT'
+            B = obj.type == 'MESH'
+            return A and B
 
 
     def execute(self, context):
         obj = context.object                 #select canvas object
         objProp = bpy.ops.object
 
-        bpy.ops.paint.texture_paint_toggle()    #return object mode
         objProp.duplicate_move()               #duplicate mesh object
-
+        objProp.join()                 #join active & selected mesh
         objProp.convert(target='CURVE')       #convert active in curve
-        cv = context.object
-        obj.select = True
-
-        context.scene.objects.active = cv
+        cv = context.active_object
         objProp.editmode_toggle()                 #toggle curve edit
-        bpy.ops.curve.cyclic_toggle()              #close the spline
         cv.data.dimensions = '2D'             #set to 2D = create face
-
         objProp.editmode_toggle()              #toggle curve mode
         objProp.convert(target='MESH')        #convert active in mesh
-        objProp.join()                 #join active & selected mesh
 
         objProp.editmode_toggle()                  #toggle edit mode
         bpy.ops.mesh.select_all(action='TOGGLE')    #deselect all
-        #uv unwrap -> camera view
-        bpy.ops.uv.project_from_view(scale_to_bounds=False)
+        bpy.ops.uv.project_from_view(scale_to_bounds=False)#uv cam unwrap
 
         objProp.editmode_toggle()               #return object mode
         bpy.ops.paint.texture_paint_toggle()    #return Paint  mode
