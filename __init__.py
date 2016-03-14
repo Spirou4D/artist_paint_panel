@@ -41,11 +41,10 @@ from bpy.types import   AddonPreferences,\
                         Panel,\
                         UIList,\
                         Operator
-
-from bpy.props import *
-import os
 import math
+import os
 SEP = os.sep
+
 
 ########################
 #      Properties      #
@@ -72,14 +71,14 @@ class ArtistPaintPanelPrefs(AddonPreferences):
 
 
 #######################
-#       UI Tools       #
+#       UI Tools       #WARNING = not used actually!
 #######################
 #----------------------------------------------Display message
 class MessageOperator(Operator):
     bl_idname = "error.message"
     bl_label = "Message"
 
-    message = StringProperty()
+    message = bpy.props.StringProperty()
 
     def execute(self, context):
         self.report({'INFO'}, self.message)
@@ -115,13 +114,12 @@ class ImageReload(Operator):
     bl_description = "Reload canvas's image"
     bl_idname = "artist_paint.reload_saved_state"
     bl_label = ""
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         original_type = context.area.type
@@ -136,13 +134,12 @@ class SaveImage(Operator):
     bl_description = ""
     bl_idname = "artist_paint.save_current"
     bl_label = "Save Image Current"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         original_type = context.area.type
@@ -162,9 +159,8 @@ class SaveIncremImage(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         original_type = context.area.type
@@ -269,7 +265,7 @@ class BrushMakerScene(Operator):
         return {'FINISHED'}
 
 
-#-------------------------------------------------     -Shaderless
+#------------------------------------------------------Shaderless
 class CanvasShadeless(Operator):
     """Canvas made shadeless Macro"""
     bl_description = ""
@@ -279,9 +275,8 @@ class CanvasShadeless(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         context.space_data.viewport_shade = 'TEXTURED'  #texture draw
@@ -301,9 +296,8 @@ class CameraviewPaint(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         #init
@@ -399,14 +393,13 @@ class CameraviewPaint(Operator):
 class TraceSelection(Operator):
     """Convert gpencil to CURVE"""
     bl_idname = "artist_paint.trace_selection"
-    bl_label = "Setup Mirror Canvas"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_label = "Make Mesh Mask from Gpencil's drawing"
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         scene = context.scene
@@ -425,11 +418,11 @@ class TraceSelection(Operator):
                 lrs.append(lay)
         cv = lrs[-1]
         context.scene.objects.active = cv
-        objProp.origin_set(type='ORIGIN_GEOMETRY')
+        objProp.origin_set(type='ORIGIN_GEOMETRY')   #origine to center
 
-        objProp.editmode_toggle()                 #return edit mode
+        objProp.editmode_toggle()             #return curve edit mode
         cvProp = bpy.ops.curve
-        cvProp.cyclic_toggle()     #return curve object mode
+        cvProp.cyclic_toggle()                   #close the spline
         cv.data.dimensions = '2D'
 
         objProp.editmode_toggle()               #return object mode
@@ -441,10 +434,6 @@ class TraceSelection(Operator):
         bpy.ops.uv.project_from_view(camera_bounds=True,
                                         correct_aspect=False,
                                         scale_to_bounds=False)
-        #Add a material+texture diffuse
-        mat = bpy.data.materials.new("default")
-        cv.data.materials.append(mat)
-        cv.active_material.use_shadeless = True
 
         #select canvas
         obj.select = True
@@ -464,6 +453,87 @@ class TraceSelection(Operator):
         return {'FINISHED'}
 
 
+#-----------------------------------------------Curve Bezier to Poly
+class CurvePoly2d(Operator):
+    """Curve added and made poly 2d Macro"""
+    bl_description = "Create 2D Poly Vector Mask"
+    bl_idname = "artist_paint.curve_2dpoly"
+    bl_label = "Create 2D Bezier Vector Mask"
+    bl_options = { 'REGISTER', 'UNDO' }
+
+    @classmethod
+    def poll(self, context):
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.object                   #select canvas object
+        objProp = bpy.ops.object
+
+        bpy.ops.paint.texture_paint_toggle()    #return object mode
+        bpy.ops.view3d.snap_cursor_to_center()    #center the cursor
+        bpy.ops.curve.primitive_bezier_curve_add()      #add curve
+        cv = context.object
+        cvProp = bpy.ops.curve
+        bpy.ops.object.editmode_toggle()            #toggle curve edit
+        cvProp.spline_type_set(type= 'POLY') #change to poly spline
+        bpy.context.object.data.dimensions = '2D'     #change to 2d
+        cvProp.delete(type='VERT')
+        vtx = cvProp.vertex_add(location=(0, 0, 0))
+        cvProp.handle_type_set(type='VECTOR')
+        objProp.editmode_toggle()            #toggle object mode
+
+        obj.select = True                           #select canvas
+        context.scene.objects.active = obj      #layer parent to canvas
+        bpy.ops.object.parent_set(type='OBJECT',
+                                    xmirror=False,
+                                    keep_transform=False)
+        context.scene.objects.active = cv
+        objProp.editmode_toggle()                 #toggle curve edit
+        return {'FINISHED'}
+
+
+#-----------------------------------------------close, mesh and unwrap
+class CloseCurveunwrap(Operator):
+    """Close the curve, set to mesh and unwrap"""
+    bl_description = "Convert Vector to Mesh"
+    bl_idname = "artist_paint.curve_unwrap"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'CURVE' #Must add edit mode condition!
+
+    def execute(self, context):
+        cv = context.object
+        tool_settings = context.scene.tool_settings
+        cvProp = bpy.ops.curve
+        objProp = bpy.ops.object
+
+        cvProp.select_all(action='TOGGLE')        #Init selection
+        cvProp.select_all(action='TOGGLE')        #select points
+        cvProp.cyclic_toggle()                    #close spline
+        cv.data.dimensions = '2D'
+        objProp.editmode_toggle()               #toggle object mode
+        objProp.convert(target='MESH')            #convert to mesh
+
+        objProp.editmode_toggle()                 #toggle edit mode
+        bpy.ops.mesh.select_all(action='TOGGLE')     #select all
+        bpy.ops.uv.project_from_view(correct_aspect=False)#uv cam unwrap
+        objProp.editmode_toggle()          #toggle object mode
+        context.object.location[2] = 0.01
+
+        bpy.ops.paint.texture_paint_toggle()    #return in paint mode
+        tool_settings.image_paint.use_occlude = False
+        tool_settings.image_paint.use_backface_culling = False
+        tool_settings.image_paint.use_normal_falloff = False
+        tool_settings.image_paint.seam_bleed = 0
+        return {'FINISHED'}
+
+
+#-------------------------------------------Invert all mesh mask
 class CurvePolyinvert(Operator):
     """Inverte Mesh Mask"""
     bl_idname = "artist_paint.inverted_mask"
@@ -472,91 +542,37 @@ class CurvePolyinvert(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object:
-            return context.active_object.type == 'MESH'
-        return False
-
-    def execute(self, context):
-        scene = context.scene
-        bpy.ops.object.select_by_type(type = 'MESH')
-        bpy.ops.object.duplicate_move()                        #dup
-        bpy.ops.object.convert(target='CURVE')
-        context.object.data.dimensions = '2D'
-        bpy.ops.object.join()
-        bpy.ops.object.convert(target='MESH')
-
-        bpy.ops.object.editmode_toggle()             #toggle edit mode
-        bpy.ops.mesh.select_all(action='TOGGLE')      #select all faces
-        bpy.ops.uv.project_from_view()        #uv unwrap -> camera view
-
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.paint.texture_paint_toggle()
-        return {'FINISHED'}
-
-
-#-----------------------------------------------Curve Bezier to Poly
-class CurvePoly2d(Operator):
-    """Curve added and made poly 2d Macro"""
-    bl_description = "Create Bezier2Poly Curve"
-    bl_idname = "artist_paint.curve_2dpoly"
-    bl_label = "Curve 2D Poly"
-    bl_options = { 'REGISTER', 'UNDO' }
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
 
     def execute(self, context):
-        #add curve
-        bpy.ops.curve.primitive_bezier_curve_add(radius=1,
-                                    view_align=False,
-                                    enter_editmode=True,
-                                    layers=(True, False, False,
-                                    False, False, False, False,
-                                    False, False, False, False,
-                                    False, False, False, False,
-                                    False, False, False, False,
-                                    False))
-        #change to poly spline
-        bpy.ops.curve.spline_type_set(type= 'POLY')
-        #change to 2d
-        bpy.context.object.data.dimensions = '2D'
-        return {'FINISHED'}
+        obj = context.object                 #select canvas object
+        objProp = bpy.ops.object
 
+        bpy.ops.paint.texture_paint_toggle()    #return object mode
+        objProp.duplicate_move()               #duplicate mesh object
 
-#-----------------------------------------------close, mesh and unwrap
-class CloseCurveunwrap(Operator):
-    """Close the curve, set to mesh and unwrap"""
-    bl_description = "Close, mesh and unwrap"
-    bl_idname = "artist_paint.curve_unwrap"
-    bl_label = "Close and Unwrap"
-    bl_options = { 'REGISTER', 'UNDO' }
+        objProp.convert(target='CURVE')       #convert active in curve
+        cv = context.object
+        obj.select = True
 
-    def execute(self, context):
-        #deselect and select points
-        bpy.ops.curve.select_all(action='TOGGLE')
-        bpy.ops.curve.select_all(action='TOGGLE')
+        context.scene.objects.active = cv
+        objProp.editmode_toggle()                 #toggle curve edit
+        bpy.ops.curve.cyclic_toggle()              #close the spline
+        cv.data.dimensions = '2D'             #set to 2D = create face
 
-        #close curve
-        bpy.ops.curve.cyclic_toggle()
+        objProp.editmode_toggle()              #toggle curve mode
+        objProp.convert(target='MESH')        #convert active in mesh
+        objProp.join()                 #join active & selected mesh
 
-        #toggle object mode
-        bpy.ops.object.editmode_toggle()
+        objProp.editmode_toggle()                  #toggle edit mode
+        bpy.ops.mesh.select_all(action='TOGGLE')    #deselect all
+        #uv unwrap -> camera view
+        bpy.ops.uv.project_from_view(scale_to_bounds=False)
 
-        #convert to mesh
-        bpy.ops.object.convert(target='MESH')
-
-        #toggle edit mode
-        bpy.ops.object.editmode_toggle()
-
-        #select all
-        bpy.ops.mesh.select_all(action='TOGGLE')
-
-        #uv unwrap inside camera view
-        bpy.ops.uv.project_from_view(camera_bounds=True,
-                                    correct_aspect=False,
-                                    scale_to_bounds=False)
-
-        #tex paint toggle
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.paint.texture_paint_toggle()
+        objProp.editmode_toggle()               #return object mode
+        bpy.ops.paint.texture_paint_toggle()    #return Paint  mode
         return {'FINISHED'}
 
 
@@ -565,24 +581,20 @@ class CanvasHoriz(Operator):
     """Canvas Flip Horizontal Macro"""
     bl_idname = "artist_paint.canvas_horizontal"
     bl_label = "Canvas horiz"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
-        if context.active_object:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
-
-        #toggle texture mode / object mode
-        bpy.ops.paint.texture_paint_toggle()
+        bpy.ops.paint.texture_paint_toggle()     #toggle Object mode
 
         # Horizontal mirror
         bpy.ops.transform.mirror(constraint_axis=(True, False, False))
 
-        #toggle object to texture
-        bpy.ops.paint.texture_paint_toggle()
+        bpy.ops.paint.texture_paint_toggle()     #return Paint mode
         return {'FINISHED'}
 
 
@@ -591,23 +603,20 @@ class CanvasVertical(Operator):
     """Canvas Flip Vertical Macro"""
     bl_idname = "artist_paint.canvas_vertical"
     bl_label = "Canvas Vertical"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
-        #toggle texture mode/object mode
-        bpy.ops.paint.texture_paint_toggle()
+        bpy.ops.paint.texture_paint_toggle()    #toggle Object mode
 
         # Vertical mirror
         bpy.ops.transform.mirror(constraint_axis=(False, True, False))
 
-        #toggle texture mode/object mode
-        bpy.ops.paint.texture_paint_toggle()
+        bpy.ops.paint.texture_paint_toggle()    #toggle Paint mode
         return {'FINISHED'}
 
 
@@ -621,10 +630,8 @@ class RotateCanvasCCW15(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
-
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         _customAngle = math.radians(context.scene.CustomAngle)
@@ -670,9 +677,8 @@ class RotateCanvasCW15(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         _customAngle = math.radians(context.scene.CustomAngle)
@@ -717,9 +723,8 @@ class RotateCanvasCCW(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         _bool01 = context.scene.ArtistPaint_Bool01
@@ -783,9 +788,8 @@ class RotateCanvasCW(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         _bool01 = context.scene.ArtistPaint_Bool01
@@ -849,9 +853,8 @@ class CanvasResetrot(Operator):
 
     @classmethod
     def poll(self, context):
-        if context.active_object is not None:
-            return context.active_object.type == 'MESH'
-        return False
+        obj =  context.active_object
+        return obj is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
         #init
@@ -949,7 +952,8 @@ class ArtistPanel(Panel):
         col.label(text="Special Macros")
         row = col.row(align = True)
         row.operator("artist_paint.canvas_shadeless",
-                    text = "Shadeless Canvas", icon = 'FORCE_TEXTURE')
+                    text = "Shadeless Canvas",
+                    icon = 'FORCE_TEXTURE')
         row.operator("artist_paint.cameraview_paint",
                     text = "Add Painting Camera",
                     icon = 'RENDER_REGION')
@@ -959,26 +963,26 @@ class ArtistPanel(Panel):
         col = box.column(align = True)
         col.label(text="Object Masking Tools") #OBJECTS MASKING TOOLS
         col.operator("artist_paint.trace_selection",
-                    text = "Mask from Gpencil",
-                    icon = 'CURVE_BEZCIRCLE')
+                    text = "Mesh Mask from Gpencil",
+                    icon = 'OUTLINER_OB_MESH')
 
-        col.separator() # empty line
-
-        col.operator("artist_paint.inverted_mask",
-                    text = "Mask Inversion",
-                    icon = 'MOD_TRIANGULATE')
-
-        col.separator() # empty line
+        col.separator() #empty line
 
         row = col.row(align = True)
         row.operator("artist_paint.curve_2dpoly",
-                    text = "A. 2D Mask Maker",
+                    text = "Make Vector Mask",
                     icon = 'PARTICLE_POINT')
         row.operator("artist_paint.curve_unwrap",
-                    text = "B. Close Mask & Unwrap",
-                    icon = 'CURVE_NCIRCLE')
+                    text = "",
+                    icon = 'OUTLINER_OB_MESH')
 
-        col.separator() # empty line
+        col.separator() #empty line
+
+        col.operator("artist_paint.inverted_mask",
+                    text = "Mesh Mask Inversion",
+                    icon = 'MOD_TRIANGULATE')
+
+        col.separator() #empty line
 
         col.prop(ipaint, "use_stencil_layer", text="Stencil Mask")
         if ipaint.use_stencil_layer == True:
@@ -989,7 +993,8 @@ class ArtistPanel(Panel):
             row = cel.row(align = True)
             row.prop(ipaint, "stencil_color", text="")
             row.prop(ipaint, "invert_stencil",
-                        text="Invert the mask", icon='IMAGE_ALPHA')
+                        text="Invert the mask",
+                        icon='IMAGE_ALPHA')
 
 
         box = layout.box()
