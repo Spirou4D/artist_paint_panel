@@ -419,11 +419,11 @@ class TraceSelection(Operator):
                 lrs.append(lay)
         cv = lrs[-1]
         context.scene.objects.active = cv
-        objProp.origin_set(type='ORIGIN_GEOMETRY')   #origine to center
+        objProp.origin_set(type='ORIGIN_GEOMETRY') #origine to geometry
 
         objProp.editmode_toggle()             #return curve edit mode
         cvProp = bpy.ops.curve
-        cvProp.cyclic_toggle()                   #close the spline
+        cvProp.cyclic_toggle()                   #inverte the spline
         cv.data.dimensions = '2D'
 
         objProp.editmode_toggle()               #return object mode
@@ -471,7 +471,7 @@ class CurvePoly2d(Operator):
             return A and B
 
     def execute(self, context):
-        obj = context.object                   #select canvas object
+        obj = context.object                   #selected canvas object
         objProp = bpy.ops.object
 
         bpy.ops.paint.texture_paint_toggle()    #return object mode
@@ -479,12 +479,11 @@ class CurvePoly2d(Operator):
         bpy.ops.curve.primitive_bezier_curve_add()      #add curve
         cv = context.object
         cvProp = bpy.ops.curve
+        cv.layers[0]                  #place the curve on the layer 1
         bpy.ops.object.editmode_toggle()            #toggle curve edit
         cvProp.spline_type_set(type= 'POLY') #change to poly spline
         bpy.context.object.data.dimensions = '2D'     #change to 2d
         cvProp.delete(type='VERT')
-        vtx = cvProp.vertex_add(location=(0, 0, 0))
-        cvProp.handle_type_set(type='VECTOR')
         objProp.editmode_toggle()            #toggle object mode
 
         obj.select = True                           #select canvas
@@ -494,6 +493,8 @@ class CurvePoly2d(Operator):
                                     keep_transform=False)
         context.scene.objects.active = cv
         objProp.editmode_toggle()                 #toggle curve edit
+        cvProp.vertex_add()
+        cvProp.handle_type_set(type='VECTOR')
         return {'FINISHED'}
 
 
