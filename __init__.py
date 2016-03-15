@@ -79,7 +79,7 @@ class MessageOperator(Operator):
     bl_idname = "error.message"
     bl_label = "Message"
 
-    message = bpy.props.StringProperty()
+    message = StringProperty()
 
     def execute(self, context):
         self.report({'INFO'}, self.message)
@@ -88,22 +88,14 @@ class MessageOperator(Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        return wm.invoke_popup(self, width=400, height=300)
+        return wm.invoke_props_dialog(self, width=400, height=300)
 
     def draw(self, context):
         layout = self.layout
         layout.label("WARNING !")
-        row = layout.row()
+        row = layout.row(align=True)
         row.label(self.message)
-        row = layout.row()
-
-#-----------------------------The OK button in the error dialog
-class OkOperator(Operator):
-    bl_idname = "error.ok"
-    bl_label = "OK"
-    def execute(self, context):
-        return {'FINISHED'}
-
+        layout.separator()
 
 
 #######################
@@ -282,7 +274,7 @@ class CanvasShadeless(Operator):
     def execute(self, context):
         context.space_data.viewport_shade = 'TEXTURED'  #texture draw
         context.object.active_material.use_shadeless = True #shadeless
-        bpy.ops.view3d.localview()             #change to local view
+        #bpy.ops.view3d.localview()             #change to local view
         bpy.ops.paint.texture_paint_toggle()   #change to Texture Paint
         return {'FINISHED'}
 
@@ -293,7 +285,7 @@ class CameraviewPaint(Operator):
     bl_description = ""
     bl_idname = "artist_paint.cameraview_paint"
     bl_label = "Cameraview Paint"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
@@ -313,7 +305,6 @@ class CameraviewPaint(Operator):
             if cam.name == _camName:
                 prefix = 'Already found a camera for this image : '
                 bpy.ops.error.message('INVOKE_DEFAULT',
-                                        type = "Error",
                                     message =  prefix + _camName )
                 return {'FINISHED'}
 
@@ -460,7 +451,7 @@ class CurvePoly2d(Operator):
     bl_description = "Create 2D Poly Vector Mask"
     bl_idname = "artist_paint.curve_2dpoly"
     bl_label = "Create 2D Bezier Vector Mask"
-    bl_options = { 'REGISTER', 'UNDO' }
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
@@ -486,15 +477,16 @@ class CurvePoly2d(Operator):
         cvProp.delete(type='VERT')
         objProp.editmode_toggle()            #toggle object mode
 
-        obj.select = True                           #select canvas
         context.scene.objects.active = obj      #layer parent to canvas
         bpy.ops.object.parent_set(type='OBJECT',
                                     xmirror=False,
                                     keep_transform=False)
         context.scene.objects.active = cv
+        cv.name = "Mask"
         objProp.editmode_toggle()                 #toggle curve edit
         cvProp.vertex_add()
         cvProp.handle_type_set(type='VECTOR')
+        context.space_data.show_manipulator = False
         return {'FINISHED'}
 
 
@@ -515,8 +507,8 @@ class CloseCurveunwrap(Operator):
             return A and B
 
     def execute(self, context):
-        cv = context.object
-        tool_settings = context.scene.tool_settings
+        cv = context.object           #In curve edit, the vector curve
+        _cvName = cv.name
         cvProp = bpy.ops.curve
         objProp = bpy.ops.object
 
@@ -526,14 +518,16 @@ class CloseCurveunwrap(Operator):
         cv.data.dimensions = '2D'
         objProp.editmode_toggle()               #toggle object mode
         objProp.convert(target='MESH')            #convert to mesh
-
+        obj = context.object
         objProp.editmode_toggle()                 #toggle edit mode
         bpy.ops.mesh.select_all(action='TOGGLE')     #select all
         bpy.ops.uv.project_from_view(correct_aspect=False)#uv cam unwrap
-        objProp.editmode_toggle()          #toggle object mode
-        context.object.location[2] = 0.01
+        objProp.editmode_toggle()               #toggle object mode
+        obj.name = "+ " + _cvName              #name the new mask
+        obj.location[2] = 1e-6              #Raise the mask in Z level
 
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
+        tool_settings = context.scene.tool_settings
         tool_settings.image_paint.use_occlude = False
         tool_settings.image_paint.use_backface_culling = False
         tool_settings.image_paint.use_normal_falloff = False
@@ -547,36 +541,49 @@ class CurvePolyinvert(Operator):
     bl_idname = "artist_paint.inverted_mask"
     bl_description = "Inverte Mesh Mask in Object mode only"
     bl_label = "Inverte Mesh Mask"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
-        obj =  context.active_object
+        obj =  context.object
         if obj is not None:
             A = obj.mode=='OBJECT'
             B = obj.type == 'MESH'
             return A and B
 
-
+    #Canvas selected &Actived mask  must be selected together
     def execute(self, context):
-        obj = context.object                 #select canvas object
+        objects = context.selected_objects
+        if len(objects) != 2:
+            bpy.ops.error.message('INVOKE_DEFAULT',
+                        message = 'Two meshes must \
+                        be selected and visible in outliner, please.')
+            return {'FINISHED'}
+
+        objS = objects[0]                           #selected Canvas
+        objA = objects[-1]                           #Actived mask
         objProp = bpy.ops.object
 
-        objProp.duplicate_move()               #duplicate mesh object
-        objProp.join()                 #join active & selected mesh
+        objProp.duplicate_move()               #duplicate mesh objects
+        objProp.join()                     #join active & selected mesh
         objProp.convert(target='CURVE')       #convert active in curve
-        cv = context.active_object
+        mk = context.active_object            #cv the new result curve
         objProp.editmode_toggle()                 #toggle curve edit
-        cv.data.dimensions = '2D'             #set to 2D = create face
+        mk.data.dimensions = '2D'             #set to 2D = create face
         objProp.editmode_toggle()              #toggle curve mode
         objProp.convert(target='MESH')        #convert active in mesh
 
         objProp.editmode_toggle()                  #toggle edit mode
         bpy.ops.mesh.select_all(action='TOGGLE')    #deselect all
         bpy.ops.uv.project_from_view(scale_to_bounds=False)#uv cam unwrap
+        objProp.editmode_toggle()                #return object mode
 
-        objProp.editmode_toggle()               #return object mode
-        bpy.ops.paint.texture_paint_toggle()    #return Paint  mode
+        mk.select = True                           #select canvas
+        context.scene.objects.active = objS      #Mask parent to canvas
+        bpy.ops.object.parent_set()
+        context.scene.objects.active = mk      #Active the Inverted Mask
+        mk.name = "- " + objA.name[1:]
+        bpy.ops.paint.texture_paint_toggle()     #return Paint  mode
         return {'FINISHED'}
 
 
@@ -630,7 +637,7 @@ class RotateCanvasCCW15(Operator):
     bl_description = "Rotate from prefs. custom angle, default=15°."
     bl_idname = "artist_paint.rotate_ccw_15"
     bl_label = "Canvas Rotate CounterClockwise 15°"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
@@ -677,7 +684,7 @@ class RotateCanvasCW15(Operator):
     bl_description = "Rotate from prefs. custom angle, default=15°."
     bl_idname = "artist_paint.rotate_cw_15"
     bl_label = "Canvas Rotate Clockwise 15°"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
@@ -697,8 +704,8 @@ class RotateCanvasCW15(Operator):
 
         #rotate canvas 15 degrees left
         bpy.ops.transform.rotate(value=-(_customAngle),
-                axis=(0, 0, 1),
-                constraint_axis=(False, False, True))
+                                axis=(0, 0, 1),
+                                constraint_axis=(False, False, True))
         if _bool01 ==True:
             bpy.ops.view3d.camera_to_view_selected()
 
@@ -723,7 +730,7 @@ class RotateCanvasCCW(Operator):
     """Image Rotate CounterClockwise 90 Macro"""
     bl_idname = "artist_paint.rotate_ccw_90"
     bl_label = "Canvas Rotate CounterClockwise 90"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
@@ -788,7 +795,7 @@ class RotateCanvasCW(Operator):
     """Image Rotate Clockwise 90 Macro"""
     bl_idname = "artist_paint.rotate_cw_90"
     bl_label = "Canvas Rotate Clockwise 90"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
