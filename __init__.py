@@ -123,7 +123,7 @@ class ImageReload(Operator):
 
 #-------------------------------------------------image save
 class SaveImage(Operator):
-    """Save Image"""
+    """Overwrite Image"""
     bl_description = ""
     bl_idname = "artist_paint.save_current"
     bl_label = "Save Image Current"
@@ -144,7 +144,7 @@ class SaveImage(Operator):
 
 #-------------------------------------------------image save
 class SaveIncremImage(Operator):
-    """Save Image"""
+    """Save Incremential Images"""
     bl_description = ""
     bl_idname = "artist_paint.save_increm"
     bl_label = "Save incremential Image Current"
@@ -297,6 +297,12 @@ class CameraviewPaint(Operator):
         obj = context.active_object
         _obName = obj.name
         _camName = "Camera_" + _obName
+
+        context.space_data.viewport_shade = 'TEXTURED'  #texture draw
+        context.object.active_material.use_shadeless = True #shadeless
+        #bpy.ops.view3d.localview()             #change to local view
+        bpy.ops.paint.texture_paint_toggle()   #change to Texture Paint
+
         #http://blender.stackexchange.com/users/660/mutant-bob
         select_mat = obj.data.materials[0].texture_slots[0].\
                                             texture.image.size[:]
@@ -521,17 +527,14 @@ class CloseCurveunwrap(Operator):
         obj = context.object
         objProp.editmode_toggle()                 #toggle edit mode
         bpy.ops.mesh.select_all(action='TOGGLE')     #select all
+        bpy.ops.mesh.normals_make_consistent(inside=False)#Normals ouside
         bpy.ops.uv.project_from_view(correct_aspect=False)#uv cam unwrap
         objProp.editmode_toggle()               #toggle object mode
         obj.name = "+ " + _cvName              #name the new mask
-        obj.location[2] = 1e-6              #Raise the mask in Z level
 
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
-        tool_settings = context.scene.tool_settings
-        tool_settings.image_paint.use_occlude = False
-        tool_settings.image_paint.use_backface_culling = False
-        tool_settings.image_paint.use_normal_falloff = False
-        tool_settings.image_paint.seam_bleed = 0
+        #ici add the material TO DO!
+        context.scene.objects.active = obj.parent      #Mask parent to canvas
         return {'FINISHED'}
 
 
@@ -547,22 +550,19 @@ class CurvePolyinvert(Operator):
     def poll(self, context):
         obj =  context.object
         if obj is not None:
-            A = obj.mode=='OBJECT'
+            A = obj.mode=='TEXTURE_PAINT'
             B = obj.type == 'MESH'
             return A and B
 
     #Canvas selected &Actived mask  must be selected together
     def execute(self, context):
-        objects = context.selected_objects
-        if len(objects) != 2:
-            bpy.ops.error.message('INVOKE_DEFAULT',
-                        message = 'Two meshes must \
-                        be selected and visible in outliner, please.')
-            return {'FINISHED'}
-
-        objS = objects[0]                           #selected Canvas
-        objA = objects[-1]                           #Actived mask
+        objA = bpy.context.object                  #Active Mask
+        objS = objA.parent                        #Select canvas
         objProp = bpy.ops.object
+
+        bpy.ops.paint.texture_paint_toggle()        #toggle object mode
+        objS.select = True                         #Select the canvas
+        context.scene.objects.active = objA         #active the mask
 
         objProp.duplicate_move()               #duplicate mesh objects
         objProp.join()                     #join active & selected mesh
@@ -574,7 +574,7 @@ class CurvePolyinvert(Operator):
         objProp.convert(target='MESH')        #convert active in mesh
 
         objProp.editmode_toggle()                  #toggle edit mode
-        bpy.ops.mesh.select_all(action='TOGGLE')    #deselect all
+        bpy.ops.mesh.select_all(action='TOGGLE')      #deselect all
         bpy.ops.uv.project_from_view(scale_to_bounds=False)#uv cam unwrap
         objProp.editmode_toggle()                #return object mode
 
@@ -583,7 +583,11 @@ class CurvePolyinvert(Operator):
         bpy.ops.object.parent_set()
         context.scene.objects.active = mk      #Active the Inverted Mask
         mk.name = "- " + objA.name[1:]
+        mk.location[2] = 0.01              #Raise the mask in Z level
+
         bpy.ops.paint.texture_paint_toggle()     #return Paint  mode
+        #ici add the material TO DO!
+        context.scene.objects.active = objS      #Mask parent to canvas
         return {'FINISHED'}
 
 
@@ -940,7 +944,7 @@ class ArtistPanel(Panel):
         col = box.column(align = True)
         row = col.row(align = True)
         row.operator("import_image.to_plane",
-                    text = "Import Img. as canvas", icon = 'IMAGE_COL')
+                    text = "Import Canvas", icon = 'IMAGE_COL')
         row.operator("artist_paint.reload_saved_state",
                      icon = 'LOAD_FACTORY')
 
@@ -950,25 +954,18 @@ class ArtistPanel(Panel):
         row.operator("artist_paint.save_increm",
                     text = "Incremental Save", icon = 'SAVE_COPY')
         col.operator("render.opengl", \
-                    text = "OpenGL Render", icon = 'RENDER_STILL')
-
-        col.label(text='') #empty line
-        col.operator("artist_paint.create_brush_scene",
-                text="Create Brush Maker Scene",
-                icon='OUTLINER_OB_CAMERA')
-
+                    text = "Snapshot", icon = 'RENDER_STILL')
 
         box = layout.box()                             #MACRO
         col = box.column(align = True)
         col.label(text="Special Macros")
-        row = col.row(align = True)
-        row.operator("artist_paint.canvas_shadeless",
-                    text = "Shadeless Canvas",
-                    icon = 'FORCE_TEXTURE')
-        row.operator("artist_paint.cameraview_paint",
-                    text = "Add Painting Camera",
+        col.operator("artist_paint.create_brush_scene",
+                text="Create Brush Maker Scene",
+                icon='OUTLINER_OB_CAMERA')
+        col.separator()
+        col.operator("artist_paint.cameraview_paint",
+                    text = "Add Shaderless Painting Camera",
                     icon = 'RENDER_REGION')
-
 
         box = layout.box()
         col = box.column(align = True)
@@ -1010,9 +1007,9 @@ class ArtistPanel(Panel):
 
         box = layout.box()
 
-        col = box.column(align = True)          #CANVAS FRAME CONTRAINT
+        col = box.column(align = True)          #CANVAS FRAME CONSTRAINT
         col.prop(context.scene, "ArtistPaint_Bool01" ,
-                                    text="Canvas Frame Contraint")
+                                    text="Canvas Frame Constraint")
         col.label(text="Mirror")                      #MIRROR FLIP
         row = col.row(align = True)
         row.operator("artist_paint.canvas_horizontal",
