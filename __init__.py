@@ -50,7 +50,23 @@ SEP = os.sep
 ########################
 #      Properties      #
 ########################
+#------------------------------------------------Create a collection
+class SceneCustomCanvas(bpy.types.PropertyGroup):
+    path = bpy.props.StringProperty(name="Test Prop", default='')
+    name = bpy.props.StringProperty(name="Test Prop", default="")
+    dimX = bpy.props.IntProperty(name="Test Prop", default=0)
+    dimY = bpy.props.IntProperty(name="Test Prop", default=0)
 
+bpy.utils.register_class(SceneCustomCanvas)
+
+bpy.types.Scene.artist_paint = \
+                    bpy.props.CollectionProperty(type=SceneCustomCanvas)
+
+bpy.types.Scene.UI_is_activated = \
+                    bpy.props.BoolProperty(default=False)
+
+
+#-----------------------------------------------Preferences of add-on
 class ArtistPaintPanelPrefs(AddonPreferences):
     """Creates the 3D view > TOOLS > Artist Paint Panel"""
     bl_idname = __name__
@@ -72,12 +88,12 @@ class ArtistPaintPanelPrefs(AddonPreferences):
 
 
 #######################
-#       UI Tools       #WARNING = not used actually!
+#       UI Tools
 #######################
 #----------------------------------------------Display message
 class MessageOperator(Operator):
     bl_idname = "error.message"
-    bl_label = "Message"
+    bl_label = "Warning Message"
 
     message = StringProperty()
 
@@ -88,19 +104,126 @@ class MessageOperator(Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        return wm.invoke_props_dialog(self, width=400, height=300)
+        return wm.invoke_popup(self, width=400, height=200)
 
     def draw(self, context):
         layout = self.layout
         layout.label("WARNING !")
         row = layout.row(align=True)
         row.label(self.message)
-        layout.separator()
+        row = self.layout.split(0.80)
+        row.label("")
+
+
+#-----------------------------The OK button in the error dialog
+class OkOperator(Operator):
+    bl_idname = "error.ok"
+    bl_label = "OK"
+
+    def execute(self, context):
+        print("ok")
+        return {'FINISHED'}
 
 
 #######################
 #       Classes       #
 #######################
+#------------------------------------------------Reset main canvas
+class ArtistPaintLoadtInit(Operator):
+    bl_idname = "artist_paint.load_init"
+    bl_label = "Init Artist Paint Add-on"
+    bl_options = {'REGISTER','UNDO'}
+
+    def execute(self, context):
+        #Init the Main Canvas object
+        scene = context.scene
+
+        init = context.scene.UI_is_activated
+
+        if len(scene.artist_paint) !=0:
+            main_canvas_0 = scene.artist_paint[0]
+            canvasName = main_canvas_0.name
+
+            if init==True:
+                warning = 'The main canvas : "'+ canvasName + \
+                        '" is removed in memory.'
+                state = bpy.ops.error.message('INVOKE_DEFAULT',\
+                                                message = warning)
+                print(state)
+                if state=={'RUNNING_MODAL'}:
+                    print('supression')
+                    scene.artist_paint.clear()
+
+                    bpy.ops.paint.texture_paint_toggle()   #change to Object mode
+                    for obj  in bpy.data.objects:
+                        if obj.name == canvasName[:-4]:
+                            obj.select = True
+                            context.scene.objects.active = obj
+                            bpy.ops.object.delete(use_global=True)
+                    for cam  in bpy.data.objects:
+                        if cam.name == ("Camera_" + canvasName)[:-4]:
+                            cam.select = True
+                            context.scene.objects.active = cam
+                            bpy.ops.object.delete(use_global=True)
+                else:
+                    return {'CANCELLED'}
+
+        if init:
+            context.scene.UI_is_activated = False
+        else:
+            context.scene.UI_is_activated = True
+        return {'FINISHED'}
+
+
+#-------------------------------------------------Load main canvas
+class ArtistPaintLoad(Operator):
+    bl_description = "Load the main canvas"
+    bl_idname = "artist_paint.canvas_load"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
+
+    filepath = bpy.props.StringProperty(subtype="FILE_PATH")
+    '''
+    def poll(cls, context):
+        return context.area and context.area.type == 'VIEW_3D'
+    '''
+    def invoke(self, context, event):
+        OBJ = context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        filePATH = self.filepath
+        fileName = os.path.split(filePATH)[-1]
+        fileDIR = os.path.dirname(filePATH)
+
+        bpy.ops.import_image.to_plane(\
+                        files=[{"name":fileName,"name":fileName}],
+                        directory=fileDIR,
+                        filter_image=True,
+                        filter_movie=True,
+                        filter_glob="",
+                        use_transparency=True,
+                        relative=False)
+
+        obj = context.active_object
+        select_mat = obj.data.materials[0].texture_slots[0].\
+                                            texture.image.size[:]
+
+        main_canvas= bpy.context.scene.artist_paint.add()
+        main_canvas.name = fileName
+        main_canvas.path = fileDIR
+        main_canvas.dimX = select_mat[0]
+        main_canvas.dimY = select_mat[1]
+
+        for main_canvas in bpy.context.scene.artist_paint:
+            print(main_canvas.name)
+            print(main_canvas.path)
+            print(str(main_canvas.dimX))
+            print(str(main_canvas.dimY))
+
+        return {'FINISHED'}
+
+
 #-------------------------------------------------reload image
 class ImageReload(Operator):
     """Reload Image Last Saved State"""
@@ -172,7 +295,7 @@ class SaveIncremImage(Operator):
         _tempName = [ _obName + '_' + '{:03d}'.format(i) + _Ext ]
 
         HOME = os.path.expanduser("~")
-        _Dir = HOME+os.path.dirname(filePATH)
+        _Dir = os.path.dirname(filePATH)
         #/home/patrinux/.config/blender/Brushes/13_Tâche_de_café
 
         #verify the brushname
@@ -255,27 +378,6 @@ class BrushMakerScene(Operator):
                 override['area'] = area
                 bpy.ops.view3d.viewnumpad(override, type = 'CAMERA')
                 break # this will break the loop after the first ran
-        return {'FINISHED'}
-
-
-#------------------------------------------------------Shaderless
-class CanvasShadeless(Operator):
-    """Canvas made shadeless Macro"""
-    bl_description = ""
-    bl_idname = "artist_paint.canvas_shadeless"
-    bl_label = "Canvas Shadeless"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(self, context):
-        obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
-
-    def execute(self, context):
-        context.space_data.viewport_shade = 'TEXTURED'  #texture draw
-        context.object.active_material.use_shadeless = True #shadeless
-        #bpy.ops.view3d.localview()             #change to local view
-        bpy.ops.paint.texture_paint_toggle()   #change to Texture Paint
         return {'FINISHED'}
 
 
@@ -387,6 +489,52 @@ class CameraviewPaint(Operator):
         return {'FINISHED'}
 
 
+#-------------------------------------------------border crop on
+class BorderCrop(Operator):
+    """Turn on Border Crop in Render Settings"""
+    bl_description = "Border Crop ON"
+    bl_idname = "artist_paint.border_crop"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        rs = context.scene.render
+        A = context.mode == 'PAINT_TEXTURE'
+        B = rs.use_border == False
+        C = rs.use_crop_to_border == False
+        return A and B and C
+
+    def execute(self, context):
+        render = context.scene.render
+        render.use_border = True
+        render.use_crop_to_border = True
+        return {'FINISHED'}
+
+
+#-------------------------------------------------border crop on
+class BorderCrop(Operator):
+    """Turn on Border Crop in Render Settings"""
+    bl_description = "Border Crop OFF"
+    bl_idname = "artist_paint.border_uncrop"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        rs = context.scene.render
+        A = context.mode == 'PAINT_TEXTURE'
+        B = rs.use_border == True
+        C = rs.use_crop_to_border == True
+        return A and B and C
+
+    def execute(self, context):
+        render = context.scene.render
+        render.use_border = False
+        render.use_crop_to_border = False
+        return {'FINISHED'}
+
+
 #-------------------------------------------Gpencil to Mask in one step
 class TraceSelection(Operator):
     """Convert gpencil to mesh"""
@@ -397,7 +545,10 @@ class TraceSelection(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        if obj is not None:
+            A = obj.mode == 'TEXTURE_PAINT'
+            B = obj.type == 'MESH'
+            return A and B
 
     def execute(self, context):
         scene = context.scene
@@ -443,7 +594,9 @@ class TraceSelection(Operator):
                                     keep_transform=False)
 
         objProp.editmode_toggle()               #return object mode
-        bpy.ops.paint.texture_paint_toggle()     #return paint mode
+        bpy.ops.paint.texture_paint_toggle()    #return in paint mode
+        context.scene.objects.active = obj
+        #ici add the material TO DO!
         tool_settings.image_paint.use_occlude = False
         tool_settings.image_paint.use_backface_culling = False
         tool_settings.image_paint.use_normal_falloff = False
@@ -550,7 +703,7 @@ class CurvePolyinvert(Operator):
     def poll(self, context):
         obj =  context.object
         if obj is not None:
-            A = obj.mode=='TEXTURE_PAINT'
+            A = context.space_data.type == 'TEXTURE_PAINT'
             B = obj.type == 'MESH'
             return A and B
 
@@ -915,16 +1068,15 @@ class CanvasResetrot(Operator):
 
 
 
-
-
 ##############################################################  panel
 class ArtistPanel(Panel):
-    """A custom panel in the viewport toolbar"""
-    bl_label = "Artist Panel"
+    bl_label = "Artist Paint Tools"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
-    bl_category = "BlenderPaint 2D"
+    bl_category = "Artist Paint 2D"
+    bl_options = {'DEFAULT_CLOSED'}
 
+    #bool property to use costraint rotation
     bpy.types.Scene.ArtistPaint_Bool01 = bpy.props.\
                                         BoolProperty(default=False)
 
@@ -932,9 +1084,25 @@ class ArtistPanel(Panel):
     def poll(self, cls):
         return bpy.context.scene.render.engine == 'BLENDER_RENDER'
 
+    def check(self, context):
+        return True
+
+    def draw_header(self, context):
+        if context.scene.UI_is_activated:
+            pic = 'FILE_TICK'
+        else:
+            pic = 'X_VEC'
+        self.layout.operator("artist_paint.load_init", text = "",
+                                                    icon = pic)
+
     def draw(self, context):
-        _strAngle = str(context.scene.CustomAngle)
         layout = self.layout
+
+        #Init the main_canvas object
+        layout.active = layout.enabled = context.scene.UI_is_activated
+
+        #------------------------------------------
+        _strAngle = str(context.scene.CustomAngle)
         toolsettings = context.tool_settings
         ipaint = context.tool_settings.image_paint
 
@@ -943,10 +1111,10 @@ class ArtistPanel(Panel):
         box.label(text="Image State")                #IMAGE STATE
         col = box.column(align = True)
         row = col.row(align = True)
-        row.operator("import_image.to_plane",
-                    text = "Import Canvas", icon = 'IMAGE_COL')
+        row.operator("artist_paint.canvas_load", \
+                    text = "Import canvas", icon = 'IMAGE_COL')
         row.operator("artist_paint.reload_saved_state",
-                     icon = 'LOAD_FACTORY')
+                                        icon = 'LOAD_FACTORY')
 
         row = col.row(align = True)
         row.operator("artist_paint.save_current",
@@ -963,9 +1131,16 @@ class ArtistPanel(Panel):
                 text="Create Brush Maker Scene",
                 icon='OUTLINER_OB_CAMERA')
         col.separator()
-        col.operator("artist_paint.cameraview_paint",
-                    text = "Add Shaderless Painting Camera",
+        row = col.row(align = True)
+        row.operator("artist_paint.cameraview_paint",
+                    text = "Set Shadeless Painting Camera",
                     icon = 'RENDER_REGION')
+        row.operator("artist_paint.border_crop",
+                    text = "",
+                    icon = 'STICKY_UVS_VERT')
+        row.operator("artist_paint.border_uncrop",
+                    text = "",
+                    icon = 'CLIPUV_DEHLT')
 
         box = layout.box()
         col = box.column(align = True)
