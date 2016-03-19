@@ -68,6 +68,9 @@ bpy.types.Scene.UI_is_activated = \
 bpy.types.Scene.bordercrop_is_activated = \
                     bpy.props.BoolProperty(default=False)
 
+bpy.types.Scene.guides_are_activated = \
+                    bpy.props.BoolProperty(default=False)
+
 bpy.types.Scene.maincanvas_is_empty = \
                     bpy.props.BoolProperty(default=True)
 
@@ -101,6 +104,7 @@ class MessageOperator(Operator):
     bl_label = "Warning Message"
 
     message = StringProperty()
+    confirm = StringProperty()
 
     def execute(self, context):
         scene = context.scene
@@ -118,12 +122,20 @@ class MessageOperator(Operator):
         row.label(self.message)
         layout.separator()
         row = layout.row(align=True)
-        row.operator("error.ok")
-
+        row.operator(self.confirm)
 
 #-----------------------------The OK button in the error dialog
 class OkOperator(Operator):
-    bl_idname = "error.ok"
+    bl_idname = "error.ok0"
+    bl_label = "OK"
+
+    def execute(self, context):
+        print('ok')
+        return {'FINISHED'}
+
+#-----------------------------The OK button in the error dialog
+class OkOperator(Operator):
+    bl_idname = "error.ok1"
     bl_label = "OK"
 
     def execute(self, context):
@@ -133,7 +145,8 @@ class OkOperator(Operator):
             canvasName = (main_canvas_0.filename)[:-4]
 
         scene.artist_paint.clear()
-        bpy.ops.paint.texture_paint_toggle()   #change to Object mode
+        if  context.mode != 'OBJECT':
+            bpy.ops.paint.texture_paint_toggle()   #change to Object mode
         for obj  in bpy.data.objects:
             if obj.name == canvasName:
                 obj.select = True
@@ -145,8 +158,8 @@ class OkOperator(Operator):
                 context.scene.objects.active = cam
                 bpy.ops.object.delete(use_global=True)
 
-        message = "The canvas : " + canvasName + " is \
-                        deleted in memory and removed with hierarchy."
+        message = "The canvas : " + canvasName + \
+                    " is  deleted in memory and removed with hierarchy."
         self.report({'INFO'}, message)
         print(message)
         context.scene.maincanvas_is_empty = True
@@ -168,14 +181,15 @@ class ArtistPaintLoadtInit(Operator):
         init = context.scene.UI_is_activated
         empty = context.scene.maincanvas_is_empty
 
-        if len(scene.artist_paint) !=0 and not(deleted):
+        if len(scene.artist_paint) !=0 and not(empty):
             main_canvas_0 = scene.artist_paint[0]
             canvasName = (main_canvas_0.filename)[:-4]
 
             warning = 'The main canvas : "'+ canvasName + \
                     '" is removed in memory.'
             state = bpy.ops.error.message('INVOKE_DEFAULT',\
-                                            message = warning)
+                                            message = warning,\
+                                            confirm ="error.ok1" )
 
         if  empty:
             if context.scene.UI_is_activated:
@@ -407,9 +421,6 @@ class CameraviewPaint(Operator):
 
         context.space_data.viewport_shade = 'TEXTURED'  #texture draw
         context.object.active_material.use_shadeless = True #shadeless
-        #bpy.ops.view3d.localview()             #change to local view
-        bpy.ops.paint.texture_paint_toggle()   #change to Texture Paint
-
         #http://blender.stackexchange.com/users/660/mutant-bob
         select_mat = obj.data.materials[0].texture_slots[0].\
                                             texture.image.size[:]
@@ -418,8 +429,11 @@ class CameraviewPaint(Operator):
             if cam.name == _camName:
                 prefix = 'Already found a camera for this image : '
                 bpy.ops.error.message('INVOKE_DEFAULT',
-                                    message =  prefix + _camName )
+                                    message =  prefix + _camName,
+                                    confirm ="error.ok0" )
                 return {'FINISHED'}
+
+        bpy.ops.paint.texture_paint_toggle()   #toggle to Paint mode
 
         #Cursor to center of world
         bpy.ops.view3d.snap_cursor_to_center()
@@ -462,11 +476,7 @@ class CameraviewPaint(Operator):
                     proportional_size=1)
 
         #switch on composition guides for use in cameraview paint
-        context.object.data.show_guide = {'CENTER',
-                            'CENTER_DIAGONAL', 'THIRDS', 'GOLDEN',
-                            'GOLDEN_TRIANGLE_A', 'GOLDEN_TRIANGLE_B',
-                            'HARMONY_TRIANGLE_A', 'HARMONY_TRIANGLE_B'
-                            }
+        context.object.data.show_guide = set()
 
         #resolution
         rnd = bpy.data.scenes[0].render
@@ -544,6 +554,37 @@ class BorderCropToggle(Operator):
             bpy.ops.artist_paint.border_crop()
             context.scene.bordercrop_is_activated=True
         return {'FINISHED'}
+
+
+#-------------------------------------------------camera guides
+class CamGuides(Operator):
+    """Turn on Camera Guides"""
+    bl_description = "Camera Guides On/Off Toggle"
+    bl_idname = "artist_paint.camera_guides"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
+
+
+    def execute(self, context):
+        scene = context.scene
+
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            for main_canvas in scene.artist_paint: #look main canvas name
+                canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                _camName = "Camera_" + canvasName
+        else:
+            return {'FINISHED'}
+
+        if bpy.data.objects[_camName]is not None:
+            cam = bpy.data.objects[_camName]
+            if cam.data.show_guide == set():
+                cam.data.show_guide = {'CENTER', 'THIRDS', 'CENTER_DIAGONAL'}
+                context.scene.guides_are_activated= True
+            else:
+                cam.data.show_guide = set()
+                context.scene.guides_are_activated = False
+        return {'FINISHED'}
+
 
 #-------------------------------------------Gpencil to Mask in one step
 class TraceSelection(Operator):
@@ -1180,9 +1221,11 @@ class ArtistPanel(Panel):
         col.operator("artist_paint.create_brush_scene",
                 text="Create Brush Maker Scene",
                 icon='OUTLINER_OB_CAMERA')
+
         col.separator()
+
         row = col.row(align = True)
-        split1 = row.split(percentage = 0.98)
+        split1 = row.split()
         split1.operator("artist_paint.cameraview_paint",
                     text = "Set Shadeless Painting Camera",
                     icon = 'RENDER_REGION')
@@ -1190,12 +1233,21 @@ class ArtistPanel(Panel):
             Icon = 'CLIPUV_DEHLT'
         else:
             Icon = 'BORDER_RECT'
+        row.separator()
         split2 = row.split()
         split2.operator("artist_paint.border_toggle",
                     text = "",
                     icon = Icon)
-        split2.active = context.scene.bordercrop_is_activated
 
+        if context.scene.guides_are_activated:
+            Icun = 'CLIPUV_DEHLT'
+        else:
+            Icun = 'MOD_LATTICE'
+        row.separator()
+        split3 = row.split()
+        split3.operator("artist_paint.camera_guides",
+                    text = "",
+                    icon = Icun)
 
         box = layout.box()
         col = box.column(align = True)
