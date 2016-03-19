@@ -52,8 +52,8 @@ SEP = os.sep
 ########################
 #------------------------------------------------Create a collection
 class SceneCustomCanvas(bpy.types.PropertyGroup):
+    filename = bpy.props.StringProperty(name="Test Prop", default="")
     path = bpy.props.StringProperty(name="Test Prop", default='')
-    name = bpy.props.StringProperty(name="Test Prop", default="")
     dimX = bpy.props.IntProperty(name="Test Prop", default=0)
     dimY = bpy.props.IntProperty(name="Test Prop", default=0)
 
@@ -65,6 +65,11 @@ bpy.types.Scene.artist_paint = \
 bpy.types.Scene.UI_is_activated = \
                     bpy.props.BoolProperty(default=False)
 
+bpy.types.Scene.bordercrop_is_activated = \
+                    bpy.props.BoolProperty(default=False)
+
+bpy.types.Scene.maincanvas_is_empty = \
+                    bpy.props.BoolProperty(default=True)
 
 #-----------------------------------------------Preferences of add-on
 class ArtistPaintPanelPrefs(AddonPreferences):
@@ -98,8 +103,8 @@ class MessageOperator(Operator):
     message = StringProperty()
 
     def execute(self, context):
-        self.report({'INFO'}, self.message)
-        print(self.message)
+        scene = context.scene
+        scene.maincanvas_is_deleted = False
         return {'FINISHED'}
 
     def invoke(self, context, event):
@@ -108,11 +113,12 @@ class MessageOperator(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.label("WARNING !")
+        layout.label("                INFORMATION")
         row = layout.row(align=True)
         row.label(self.message)
-        row = self.layout.split(0.80)
-        row.label("")
+        layout.separator()
+        row = layout.row(align=True)
+        row.operator("error.ok")
 
 
 #-----------------------------The OK button in the error dialog
@@ -121,7 +127,30 @@ class OkOperator(Operator):
     bl_label = "OK"
 
     def execute(self, context):
-        print("ok")
+        scene= context.scene
+        if len(scene.artist_paint) !=0:
+            main_canvas_0 = scene.artist_paint[0]
+            canvasName = (main_canvas_0.filename)[:-4]
+
+        scene.artist_paint.clear()
+        bpy.ops.paint.texture_paint_toggle()   #change to Object mode
+        for obj  in bpy.data.objects:
+            if obj.name == canvasName:
+                obj.select = True
+                context.scene.objects.active = obj
+                bpy.ops.object.delete(use_global=True)
+        for cam  in bpy.data.objects:
+            if cam.name == "Camera_" + canvasName:
+                cam.select = True
+                context.scene.objects.active = cam
+                bpy.ops.object.delete(use_global=True)
+
+        message = "The canvas : " + canvasName + " is \
+                        deleted in memory and removed with hierarchy."
+        self.report({'INFO'}, message)
+        print(message)
+        context.scene.maincanvas_is_empty = True
+        bpy.ops.artist_paint.load_init()
         return {'FINISHED'}
 
 
@@ -134,44 +163,25 @@ class ArtistPaintLoadtInit(Operator):
     bl_label = "Init Artist Paint Add-on"
     bl_options = {'REGISTER','UNDO'}
 
-    def execute(self, context):
-        #Init the Main Canvas object
+    def execute(self, context):          #Init the Main Canvas object
         scene = context.scene
-
         init = context.scene.UI_is_activated
+        empty = context.scene.maincanvas_is_empty
 
-        if len(scene.artist_paint) !=0:
+        if len(scene.artist_paint) !=0 and not(deleted):
             main_canvas_0 = scene.artist_paint[0]
-            canvasName = main_canvas_0.name
+            canvasName = (main_canvas_0.filename)[:-4]
 
-            if init==True:
-                warning = 'The main canvas : "'+ canvasName + \
-                        '" is removed in memory.'
-                state = bpy.ops.error.message('INVOKE_DEFAULT',\
-                                                message = warning)
-                print(state)
-                if state=={'RUNNING_MODAL'}:
-                    print('supression')
-                    scene.artist_paint.clear()
+            warning = 'The main canvas : "'+ canvasName + \
+                    '" is removed in memory.'
+            state = bpy.ops.error.message('INVOKE_DEFAULT',\
+                                            message = warning)
 
-                    bpy.ops.paint.texture_paint_toggle()   #change to Object mode
-                    for obj  in bpy.data.objects:
-                        if obj.name == canvasName[:-4]:
-                            obj.select = True
-                            context.scene.objects.active = obj
-                            bpy.ops.object.delete(use_global=True)
-                    for cam  in bpy.data.objects:
-                        if cam.name == ("Camera_" + canvasName)[:-4]:
-                            cam.select = True
-                            context.scene.objects.active = cam
-                            bpy.ops.object.delete(use_global=True)
-                else:
-                    return {'CANCELLED'}
-
-        if init:
-            context.scene.UI_is_activated = False
-        else:
-            context.scene.UI_is_activated = True
+        if  empty:
+            if context.scene.UI_is_activated:
+                context.scene.UI_is_activated = False
+            else:
+                context.scene.UI_is_activated = True
         return {'FINISHED'}
 
 
@@ -183,10 +193,7 @@ class ArtistPaintLoad(Operator):
     bl_options = {'REGISTER','UNDO'}
 
     filepath = bpy.props.StringProperty(subtype="FILE_PATH")
-    '''
-    def poll(cls, context):
-        return context.area and context.area.type == 'VIEW_3D'
-    '''
+
     def invoke(self, context, event):
         OBJ = context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
@@ -210,13 +217,14 @@ class ArtistPaintLoad(Operator):
                                             texture.image.size[:]
 
         main_canvas= bpy.context.scene.artist_paint.add()
-        main_canvas.name = fileName
+        main_canvas.filename = fileName
         main_canvas.path = fileDIR
         main_canvas.dimX = select_mat[0]
         main_canvas.dimY = select_mat[1]
+        context.scene.maincanvas_is_empty = False
 
         for main_canvas in bpy.context.scene.artist_paint:
-            print(main_canvas.name)
+            print(main_canvas.filename)
             print(main_canvas.path)
             print(str(main_canvas.dimX))
             print(str(main_canvas.dimY))
@@ -328,13 +336,10 @@ class BrushMakerScene(Operator):
 
     @classmethod
     def poll(self, context):
-        #A sub-function that controls the use of the class
-        notBScene = True
         for sc in bpy.data.scenes:
             if sc.name == "Brush":
-                notBScene = False
-        return context.area.type=='VIEW_3D'and notBScene
-
+                return False
+        return context.area.type=='VIEW_3D'
 
     def execute(self, context):
         _name="Brush"
@@ -495,15 +500,6 @@ class BorderCrop(Operator):
     bl_description = "Border Crop ON"
     bl_idname = "artist_paint.border_crop"
     bl_label = ""
-    bl_options = {'REGISTER','UNDO'}
-
-    @classmethod
-    def poll(self, context):
-        rs = context.scene.render
-        A = context.mode == 'PAINT_TEXTURE'
-        B = rs.use_border == False
-        C = rs.use_crop_to_border == False
-        return A and B and C
 
     def execute(self, context):
         render = context.scene.render
@@ -514,19 +510,10 @@ class BorderCrop(Operator):
 
 #-------------------------------------------------border crop on
 class BorderCrop(Operator):
-    """Turn on Border Crop in Render Settings"""
+    """Turn off Border Crop in Render Settings"""
     bl_description = "Border Crop OFF"
     bl_idname = "artist_paint.border_uncrop"
     bl_label = ""
-    bl_options = {'REGISTER','UNDO'}
-
-    @classmethod
-    def poll(self, context):
-        rs = context.scene.render
-        A = context.mode == 'PAINT_TEXTURE'
-        B = rs.use_border == True
-        C = rs.use_crop_to_border == True
-        return A and B and C
 
     def execute(self, context):
         render = context.scene.render
@@ -534,6 +521,29 @@ class BorderCrop(Operator):
         render.use_crop_to_border = False
         return {'FINISHED'}
 
+
+#-------------------------------------------------border crop on
+class BorderCropToggle(Operator):
+    """Set Border Crop in Render Settings"""
+    bl_description = "Set Border Crop in Render Settings"
+    bl_idname = "artist_paint.border_toggle"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        rs = context.scene.render
+        A = context.mode == 'PAINT_TEXTURE'
+        return A
+
+    def execute(self, context):
+        if context.scene.bordercrop_is_activated:
+            bpy.ops.artist_paint.border_uncrop()
+            context.scene.bordercrop_is_activated=False
+        else:
+            bpy.ops.artist_paint.border_crop()
+            context.scene.bordercrop_is_activated=True
+        return {'FINISHED'}
 
 #-------------------------------------------Gpencil to Mask in one step
 class TraceSelection(Operator):
@@ -546,14 +556,14 @@ class TraceSelection(Operator):
     def poll(self, context):
         obj =  context.active_object
         if obj is not None:
-            A = obj.mode == 'TEXTURE_PAINT'
+            A = context.mode == 'PAINT_TEXTURE'
             B = obj.type == 'MESH'
             return A and B
 
     def execute(self, context):
         scene = context.scene
         tool_settings = scene.tool_settings
-        obj = context.object                 #select canvas object
+        obj = context.active_object            #select canvas object
         objProp = bpy.ops.object
 
         bpy.ops.gpencil.convert(type='CURVE', use_timing_data=True)
@@ -566,7 +576,7 @@ class TraceSelection(Operator):
             if lay.name.find('GP_Layer') != -1:
                 lrs.append(lay)
         cv = lrs[-1]
-        context.scene.objects.active = cv
+        scene.objects.active = cv
         objProp.origin_set(type='ORIGIN_GEOMETRY') #origine to geometry
 
         objProp.editmode_toggle()             #return curve edit mode
@@ -586,7 +596,7 @@ class TraceSelection(Operator):
 
         #select canvas
         obj.select = True
-        context.scene.objects.active = obj
+        scene.objects.active = obj
 
         #layer parent to canvas
         bpy.ops.object.parent_set(type='OBJECT',
@@ -595,8 +605,18 @@ class TraceSelection(Operator):
 
         objProp.editmode_toggle()               #return object mode
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
-        context.scene.objects.active = obj
-        #ici add the material TO DO!
+        scene.objects.active = obj
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            for main_canvas in scene.artist_paint: #look main canvas name
+                canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                print("canvasName is:" + canvasName)
+            for mat in bpy.data.materials:
+                if mat.name == canvasName :      #if mainCanvas Mat exist
+                    for mt in obj.data.materials:
+                        if mt == canvasName: #look don't exist for this obj
+                            break
+                    obj.data.materials.append(mat) #add main canvas mat
+
         tool_settings.image_paint.use_occlude = False
         tool_settings.image_paint.use_backface_culling = False
         tool_settings.image_paint.use_normal_falloff = False
@@ -616,12 +636,12 @@ class CurvePoly2d(Operator):
     def poll(self, context):
         obj =  context.active_object
         if obj is not None:
-            A = obj.mode == 'TEXTURE_PAINT'
+            A = context.mode == 'PAINT_TEXTURE'
             B = obj.type == 'MESH'
             return A and B
 
     def execute(self, context):
-        obj = context.object                   #selected canvas object
+        obj = context.active_object            #selected canvas object
         objProp = bpy.ops.object
 
         bpy.ops.paint.texture_paint_toggle()    #return object mode
@@ -660,13 +680,15 @@ class CloseCurveunwrap(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        if obj is not None:
-            A = obj.mode == 'EDIT'
-            B = obj.type == 'CURVE'
-            return A and B
+        if obj is not None and obj.name is not None:
+            if obj.name.find('Mask')!=-1:
+                A = obj.mode == 'EDIT'
+                B = obj.type == 'CURVE'
+                return A and B
 
     def execute(self, context):
-        cv = context.object           #In curve edit, the vector curve
+        scene = context.scene
+        cv = context.active_object      #In curve edit, the vector curve
         _cvName = cv.name
         cvProp = bpy.ops.curve
         objProp = bpy.ops.object
@@ -686,8 +708,19 @@ class CloseCurveunwrap(Operator):
         obj.name = "+ " + _cvName              #name the new mask
 
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
-        #ici add the material TO DO!
-        context.scene.objects.active = obj.parent      #Mask parent to canvas
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            for main_canvas in scene.artist_paint: #look main canvas name
+                canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+            for mat in bpy.data.materials:
+                if mat.name == canvasName :      #if mainCanvas Mat exist
+                    for mt in obj.data.materials:
+                        if mt == canvasName: #look don't exist for this obj
+                            break
+                    obj.data.materials.append(mat) #add main canvas mat
+
+        context.scene.objects.active = obj.parent  #Mask parent to canvas
+        if context.mode != 'PAINT_TEXTURE':
+            bpy.ops.paint.texture_paint_toggle()     #return Paint mode
         return {'FINISHED'}
 
 
@@ -695,27 +728,30 @@ class CloseCurveunwrap(Operator):
 class CurvePolyinvert(Operator):
     """Inverte Mesh Mask in Object mode only"""
     bl_idname = "artist_paint.inverted_mask"
-    bl_description = "Inverte Mesh Mask in Object mode only"
+    bl_description = "Inverte Mesh Mask"
     bl_label = "Inverte Mesh Mask"
     bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(self, context):
-        obj =  context.object
-        if obj is not None:
-            A = context.space_data.type == 'TEXTURE_PAINT'
-            B = obj.type == 'MESH'
-            return A and B
+        obj =  context.active_object
+        if obj is not None and obj.name is not None:
+            if  obj.name.find('Mask')!=-1:
+                A = context.mode == 'PAINT_TEXTURE'
+                B = obj.type == 'MESH'
+                return A and B
 
     #Canvas selected &Actived mask  must be selected together
     def execute(self, context):
-        objA = bpy.context.object                  #Active Mask
-        objS = objA.parent                        #Select canvas
+        scene = context.scene
         objProp = bpy.ops.object
+
+        objA = context.active_object                  #Active Mask
+        objS = objA.parent                        #Select canvas
 
         bpy.ops.paint.texture_paint_toggle()        #toggle object mode
         objS.select = True                         #Select the canvas
-        context.scene.objects.active = objA         #active the mask
+        scene.objects.active = objA                #active the mask
 
         objProp.duplicate_move()               #duplicate mesh objects
         objProp.join()                     #join active & selected mesh
@@ -732,15 +768,28 @@ class CurvePolyinvert(Operator):
         objProp.editmode_toggle()                #return object mode
 
         mk.select = True                           #select canvas
-        context.scene.objects.active = objS      #Mask parent to canvas
-        bpy.ops.object.parent_set()
-        context.scene.objects.active = mk      #Active the Inverted Mask
-        mk.name = "- " + objA.name[1:]
-        mk.location[2] = 0.01              #Raise the mask in Z level
+        scene.objects.active = objS            #active the Inv. mask
+        bpy.ops.object.parent_set()            #Mask parent to canvas
+
+        scene.objects.active = mk      #Active the Inverted Mask
+        mk.name = "- " + objA.name[1:]               #name it
+        mk.location[2] = 0.01              #Raise the Z level inv. mask
 
         bpy.ops.paint.texture_paint_toggle()     #return Paint  mode
-        #ici add the material TO DO!
-        context.scene.objects.active = objS      #Mask parent to canvas
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            for main_canvas in scene.artist_paint: #look main canvas name
+                canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+            for mat in bpy.data.materials:
+                if mat.name == canvasName :      #if mainCanvas Mat exist
+                    for mt in mk.data.materials:
+                        if mt == canvasName: #look don't exist for this obj
+                            break
+                    mk.data.materials.append(mat) #add main canvas mat
+
+
+        context.scene.objects.active = objS  #return to the main canvas
+        if context.mode != 'PAINT_TEXTURE':
+            bpy.ops.paint.texture_paint_toggle()     #return Paint mode
         return {'FINISHED'}
 
 
@@ -1099,6 +1148,7 @@ class ArtistPanel(Panel):
         layout = self.layout
 
         #Init the main_canvas object
+        #layout.active
         layout.active = layout.enabled = context.scene.UI_is_activated
 
         #------------------------------------------
@@ -1132,15 +1182,20 @@ class ArtistPanel(Panel):
                 icon='OUTLINER_OB_CAMERA')
         col.separator()
         row = col.row(align = True)
-        row.operator("artist_paint.cameraview_paint",
+        split1 = row.split(percentage = 0.98)
+        split1.operator("artist_paint.cameraview_paint",
                     text = "Set Shadeless Painting Camera",
                     icon = 'RENDER_REGION')
-        row.operator("artist_paint.border_crop",
+        if context.scene.bordercrop_is_activated:
+            Icon = 'CLIPUV_DEHLT'
+        else:
+            Icon = 'BORDER_RECT'
+        split2 = row.split()
+        split2.operator("artist_paint.border_toggle",
                     text = "",
-                    icon = 'STICKY_UVS_VERT')
-        row.operator("artist_paint.border_uncrop",
-                    text = "",
-                    icon = 'CLIPUV_DEHLT')
+                    icon = Icon)
+        split2.active = context.scene.bordercrop_is_activated
+
 
         box = layout.box()
         col = box.column(align = True)
@@ -1149,7 +1204,7 @@ class ArtistPanel(Panel):
                     text = "Mesh Mask from Gpencil",
                     icon = 'OUTLINER_OB_MESH')
 
-        col.separator() #empty line
+        col.separator()
 
         row = col.row(align = True)
         row.operator("artist_paint.curve_2dpoly",
@@ -1159,14 +1214,14 @@ class ArtistPanel(Panel):
                     text = "",
                     icon = 'OUTLINER_OB_MESH')
 
-        col.separator() #empty line
 
         col.operator("artist_paint.inverted_mask",
                     text = "Mesh Mask Inversion",
                     icon = 'MOD_TRIANGULATE')
 
-        col.separator() #empty line
+        col.separator()
 
+        row = col.row(align = True)
         col.prop(ipaint, "use_stencil_layer", text="Stencil Mask")
         if ipaint.use_stencil_layer == True:
             cel = box.column(align = True)
