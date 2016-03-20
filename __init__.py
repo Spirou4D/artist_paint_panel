@@ -50,7 +50,7 @@ SEP = os.sep
 ########################
 #      Properties      #
 ########################
-#------------------------------------------------Create a collection
+#-------------------------------------------get the addon preferences
 def get_addon_preferences():
 	#bpy.context.user_preferences.addons["notify_after_render"].preferences['sent_sms']=1
 	#Par exemple:
@@ -59,30 +59,23 @@ def get_addon_preferences():
 	addon_preferences = bpy.context.user_preferences.addons[__name__].preferences
 	return addon_preferences
 
-
+#------------------------------------------------Create a collection
 class SceneCustomCanvas(bpy.types.PropertyGroup):
     filename = bpy.props.StringProperty(name="Test Prop", default="")
     path = bpy.props.StringProperty(name="Test Prop", default='')
     dimX = bpy.props.IntProperty(name="Test Prop", default=0)
     dimY = bpy.props.IntProperty(name="Test Prop", default=0)
-
 bpy.utils.register_class(SceneCustomCanvas)
+
 
 bpy.types.Scene.artist_paint = \
                     bpy.props.CollectionProperty(type=SceneCustomCanvas)
-
 bpy.types.Scene.UI_is_activated = \
                     bpy.props.BoolProperty(default=False)
-
-
 bpy.types.Scene.maincanvas_is_empty = \
                     bpy.props.BoolProperty(default=True)
-
-
 bpy.types.Scene.bordercrop_is_activated = \
                             bpy.props.BoolProperty(default=False)
-
-
 bpy.types.Scene.guides_are_activated = \
                             bpy.props.BoolProperty(default=False)
 
@@ -100,23 +93,16 @@ class ArtistPaintPanelPrefs(AddonPreferences):
 
     Enable_Tab_APP_01 = bpy.props.BoolProperty(name = "Defaults",
                                                     default=False)
-
     Bordercrop = bpy.props.BoolProperty(name = "Bordercrop",
                                                     default=False)
-
     Guides = bpy.props.BoolProperty(name="Guides state",
                                                     default=False)
-
-    CustomAngle = \
-            bpy.props.FloatProperty(name="Custom angle of rotation",
+    CustomAngle = bpy.props.FloatProperty(name="Angle of rotation",
                                                     default=15.0)
 
-    def execute(context):
-        context.scene.bordercrop_is_activated = self.Bordercrop
-        print(self.Bordercrop)
-        context.scene.guides_are_activated = self.Guides
-        print(self.Guides)
-        return {'FINISHED'}
+    def check():
+        bpy.ops.artist_paint.init_prefs()
+        return True
 
     def draw(self, context):
         layout = self.layout
@@ -127,8 +113,8 @@ class ArtistPaintPanelPrefs(AddonPreferences):
             row.prop(self,"Guides")
             row.prop(self, "CustomAngle")
 
-'''
-#-----------------------------The OK button in the error dialog
+
+#---------------------------------------Init variable with prefs
 class InitPrefs(Operator):
     bl_idname = "artist_paint.init_prefs"
     bl_label = "Init Preferences"
@@ -137,11 +123,12 @@ class InitPrefs(Operator):
         scene = context.scene
         addon_prefs = get_addon_preferences()
         scene.bordercrop_is_activated = addon_prefs.Bordercrop
-        print(scene.bordercrop_is_activated)
         scene.guides_are_activated = addon_prefs.Guides
+
+        print(scene.bordercrop_is_activated)
         print(scene.guides_are_activated)
         return {'FINISHED'}
-'''
+
 #######################
 #       UI Tools
 #######################
@@ -232,7 +219,7 @@ class ArtistPaintLoadtInit(Operator):
         init = context.scene.UI_is_activated
         empty = context.scene.maincanvas_is_empty
 
-        if len(scene.artist_paint) !=0 and not(empty):
+        if not(empty):
             main_canvas_0 = scene.artist_paint[0]
             canvasName = (main_canvas_0.filename)[:-4]
 
@@ -241,8 +228,8 @@ class ArtistPaintLoadtInit(Operator):
             state = bpy.ops.error.message('INVOKE_DEFAULT',\
                                             message = warning,\
                                             confirm ="error.ok1" )
-
-        if  empty:
+        else:
+            bpy.ops.artist_paint.init_prefs()
             if context.scene.UI_is_activated:
                 context.scene.UI_is_activated = False
             else:
@@ -265,7 +252,6 @@ class ArtistPaintLoad(Operator):
 
     def execute(self, context):
         filePATH = self.filepath
-        print(filePATH)
         fileName = os.path.split(filePATH)[-1]
         fileDIR = os.path.dirname(filePATH)
 
@@ -563,7 +549,6 @@ class BorderCrop(Operator):
     """Turn on Border Crop in Render Settings"""
     bl_description = "Border Crop ON"
     bl_idname = "artist_paint.border_crop"
-    bl_label = ""
 
     def execute(self, context):
         render = context.scene.render
@@ -573,11 +558,10 @@ class BorderCrop(Operator):
 
 
 #-------------------------------------------------border crop on
-class BorderCrop(Operator):
+class BorderUnCrop(Operator):
     """Turn off Border Crop in Render Settings"""
     bl_description = "Border Crop OFF"
     bl_idname = "artist_paint.border_uncrop"
-    bl_label = ""
 
     def execute(self, context):
         render = context.scene.render
