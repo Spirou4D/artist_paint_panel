@@ -182,19 +182,21 @@ class OkOperator(Operator):
             main_canvas_0 = scene.artist_paint[0]
             canvasName = (main_canvas_0.filename)[:-4]
 
-        scene.artist_paint.clear()
         if  context.mode != 'OBJECT':
             bpy.ops.paint.texture_paint_toggle()   #change to Object mode
         for obj  in bpy.data.objects:
             if obj.name == canvasName:
                 obj.select = True
                 context.scene.objects.active = obj
+                bpy.ops.object.select_hierarchy(direction='CHILD', \
+                                                        extend=True)
                 bpy.ops.object.delete(use_global=True)
         for cam  in bpy.data.objects:
             if cam.name == "Camera_" + canvasName:
                 cam.select = True
                 context.scene.objects.active = cam
                 bpy.ops.object.delete(use_global=True)
+        scene.artist_paint.clear()
 
         message = 'The canvas: "' + canvasName + \
                     '" is  removed in memory and deleted with his hierarchy.'
@@ -549,6 +551,8 @@ class BorderCrop(Operator):
     """Turn on Border Crop in Render Settings"""
     bl_description = "Border Crop ON"
     bl_idname = "artist_paint.border_crop"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
 
     def execute(self, context):
         render = context.scene.render
@@ -562,6 +566,8 @@ class BorderUnCrop(Operator):
     """Turn off Border Crop in Render Settings"""
     bl_description = "Border Crop OFF"
     bl_idname = "artist_paint.border_uncrop"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
 
     def execute(self, context):
         render = context.scene.render
