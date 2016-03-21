@@ -638,7 +638,18 @@ class TraceSelection(Operator):
     def execute(self, context):
         scene = context.scene
         tool_settings = scene.tool_settings
-        obj = context.active_object            #select object
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            if len(scene.artist_paint) !=0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                    print("canvasName is:" + canvasName)
+                for obj in scene.objects:
+                    if obj.name == canvasName :      #if mainCanvas Mat exist
+                        scene.objects.active = obj
+                        break
+        else:
+            return {'FINISHED'}
+        obj =  context.active_object
         objProp = bpy.ops.object
 
         bpy.ops.gpencil.convert(type='CURVE', use_timing_data=True)
@@ -671,7 +682,6 @@ class TraceSelection(Operator):
                                         scale_to_bounds=False)
 
         #select canvas
-        obj.select = True
         scene.objects.active = obj
 
         #layer parent to canvas
@@ -681,19 +691,14 @@ class TraceSelection(Operator):
 
         objProp.editmode_toggle()               #return object mode
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
+        scene.objects.active = cv
+        for mat in bpy.data.materials:
+            if mat.name == canvasName :      #if mainCanvas Mat exist
+                for mt in obj.data.materials:
+                    if mt == canvasName: #look don't exist for this obj
+                        break
+                cv.data.materials.append(mat) #add main canvas mat
         scene.objects.active = obj
-        if scene.artist_paint is not None:      #if main canvas isn't erased
-            if len(scene.artist_paint) !=0:
-                for main_canvas in scene.artist_paint: #look main canvas name
-                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-                    print("canvasName is:" + canvasName)
-                for mat in bpy.data.materials:
-                    if mat.name == canvasName :      #if mainCanvas Mat exist
-                        for mt in obj.data.materials:
-                            if mt == canvasName: #look don't exist for this obj
-                                break
-                        obj.data.materials.append(mat) #add main canvas mat
-
         tool_settings.image_paint.use_occlude = False
         tool_settings.image_paint.use_backface_culling = False
         tool_settings.image_paint.use_normal_falloff = False
@@ -1214,7 +1219,7 @@ class ArtistPanel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
     bl_category = "Artist Paint 2D"
-    bl_options = {'DEFAULT_CLOSED'}
+
 
 
     @classmethod
