@@ -56,6 +56,7 @@ def get_addon_preferences():
 	#Par exemple:
 	# addon_prefs = get_addon_preferences()
 	# addon_prefs.url_smsservice
+
 	addon_preferences = bpy.context.user_preferences.addons[__name__].preferences
 	return addon_preferences
 
@@ -82,6 +83,7 @@ bpy.types.Scene.guides_are_activated = \
 #bool property to use costraint rotation
 bpy.types.Scene.ArtistPaint_Bool01 = \
                                 bpy.props.BoolProperty(default=False)
+#bool property to use with
 bpy.types.Scene.ArtistPaint_Bool02 = \
                                 bpy.props.BoolProperty(default=False)
 
@@ -100,9 +102,6 @@ class ArtistPaintPanelPrefs(AddonPreferences):
     CustomAngle = bpy.props.FloatProperty(name="Angle of rotation",
                                                     default=15.0)
 
-    def check():
-        bpy.ops.artist_paint.init_prefs()
-        return True
 
     def draw(self, context):
         layout = self.layout
@@ -113,21 +112,6 @@ class ArtistPaintPanelPrefs(AddonPreferences):
             row.prop(self,"Guides")
             row.prop(self, "CustomAngle")
 
-
-#---------------------------------------Init variable with prefs
-class InitPrefs(Operator):
-    bl_idname = "artist_paint.init_prefs"
-    bl_label = "Init Preferences"
-
-    def execute(self, context):
-        scene = context.scene
-        addon_prefs = get_addon_preferences()
-        scene.bordercrop_is_activated = addon_prefs.Bordercrop
-        scene.guides_are_activated = addon_prefs.Guides
-
-        print(scene.bordercrop_is_activated)
-        print(scene.guides_are_activated)
-        return {'FINISHED'}
 
 #######################
 #       UI Tools
@@ -178,9 +162,10 @@ class OkOperator(Operator):
 
     def execute(self, context):
         scene= context.scene
-        if len(scene.artist_paint) !=0:
-            main_canvas_0 = scene.artist_paint[0]
-            canvasName = (main_canvas_0.filename)[:-4]
+        if scene.artist_paint is not None:
+            if len(scene.artist_paint) !=0:
+                main_canvas_0 = scene.artist_paint[0]
+                canvasName = (main_canvas_0.filename)[:-4]
 
         if  context.mode != 'OBJECT':
             bpy.ops.paint.texture_paint_toggle()   #change to Object mode
@@ -197,12 +182,11 @@ class OkOperator(Operator):
                 context.scene.objects.active = cam
                 bpy.ops.object.delete(use_global=True)
         scene.artist_paint.clear()
+        context.scene.maincanvas_is_empty = True
 
         message = 'The canvas: "' + canvasName + \
                     '" is  removed in memory and deleted with his hierarchy.'
         self.report({'INFO'}, message)
-        print(message)
-        context.scene.maincanvas_is_empty = True
         bpy.ops.artist_paint.load_init()
         return {'FINISHED'}
 
@@ -222,8 +206,10 @@ class ArtistPaintLoadtInit(Operator):
         empty = context.scene.maincanvas_is_empty
 
         if not(empty):
-            main_canvas_0 = scene.artist_paint[0]
-            canvasName = (main_canvas_0.filename)[:-4]
+            if scene.artist_paint is not None:
+                if len(scene.artist_paint) !=0:
+                    main_canvas_0 = scene.artist_paint[0]
+                    canvasName = (main_canvas_0.filename)[:-4]
 
             warning = 'Do you really want to remove "'+ canvasName + \
                     '" from memory and delete all his hierarchy?'
@@ -231,7 +217,6 @@ class ArtistPaintLoadtInit(Operator):
                                             message = warning,\
                                             confirm ="error.ok1" )
         else:
-            bpy.ops.artist_paint.init_prefs()
             if context.scene.UI_is_activated:
                 context.scene.UI_is_activated = False
             else:
@@ -606,7 +591,7 @@ class BorderCropToggle(Operator):
 class CamGuides(Operator):
     """Turn on Camera Guides"""
     bl_description = "Camera Guides On/Off Toggle"
-    bl_idname = "artist_paint.camera_guides"
+    bl_idname = "artist_paint.guides_toggle"
     bl_label = ""
     bl_options = {'REGISTER','UNDO'}
 
@@ -616,20 +601,20 @@ class CamGuides(Operator):
         guides_are_activated = context.scene.guides_are_activated
 
         if scene.artist_paint is not None:      #if main canvas isn't erased
-            if len(scene.artist_paint) > 0:
+            if len(scene.artist_paint) != 0:
                 for main_canvas in scene.artist_paint: #look main canvas name
                     canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
                     _camName = "Camera_" + canvasName
             else:
                 return {'FINISHED'}
 
-        for cam in bpy.data.objects:
+        for cam in bpy.data.objects :
             if cam.name == _camName:
-                if cam.data.show_guide == set():
+                if cam.data.show_guide == set() or not(guides_are_activated): #True = guides not visible
                     cam.data.show_guide = {'CENTER', 'THIRDS', 'CENTER_DIAGONAL'}
                     context.scene.guides_are_activated = True
-                else:
-                    cam.data.show_guide = set()
+                elif guides_are_activated:
+                    cam.data.show_guide = set() #False = guides visible
                     context.scene.guides_are_activated = False
         return {'FINISHED'}
 
@@ -644,6 +629,7 @@ class TraceSelection(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
+
         if obj is not None:
             A = context.mode == 'PAINT_TEXTURE'
             B = obj.type == 'MESH'
@@ -652,20 +638,21 @@ class TraceSelection(Operator):
     def execute(self, context):
         scene = context.scene
         tool_settings = scene.tool_settings
-        obj = context.active_object            #select canvas object
+        obj = context.active_object            #select object
         objProp = bpy.ops.object
 
         bpy.ops.gpencil.convert(type='CURVE', use_timing_data=True)
         bpy.ops.gpencil.data_unlink()
 
-        bpy.ops.paint.texture_paint_toggle()    #return object mode
+        bpy.ops.paint.texture_paint_toggle()      #return object mode
         objProp.select_by_type(type = 'CURVE')
         lrs = []
         for lay in bpy.data.objects:
             if lay.name.find('GP_Layer') != -1:
-                lrs.append(lay)
-        cv = lrs[-1]
-        scene.objects.active = cv
+                if lay.type == "CURVE":
+                    lrs.append(lay)
+        cv = lrs[-1]          #select the alone 'GP_Layer' curve object
+        scene.objects.active = cv                      #active it
         objProp.origin_set(type='ORIGIN_GEOMETRY') #origine to geometry
 
         objProp.editmode_toggle()             #return curve edit mode
@@ -696,15 +683,16 @@ class TraceSelection(Operator):
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
         scene.objects.active = obj
         if scene.artist_paint is not None:      #if main canvas isn't erased
-            for main_canvas in scene.artist_paint: #look main canvas name
-                canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-                print("canvasName is:" + canvasName)
-            for mat in bpy.data.materials:
-                if mat.name == canvasName :      #if mainCanvas Mat exist
-                    for mt in obj.data.materials:
-                        if mt == canvasName: #look don't exist for this obj
-                            break
-                    obj.data.materials.append(mat) #add main canvas mat
+            if len(scene.artist_paint) !=0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                    print("canvasName is:" + canvasName)
+                for mat in bpy.data.materials:
+                    if mat.name == canvasName :      #if mainCanvas Mat exist
+                        for mt in obj.data.materials:
+                            if mt == canvasName: #look don't exist for this obj
+                                break
+                        obj.data.materials.append(mat) #add main canvas mat
 
         tool_settings.image_paint.use_occlude = False
         tool_settings.image_paint.use_backface_culling = False
@@ -798,14 +786,15 @@ class CloseCurveunwrap(Operator):
 
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
         if scene.artist_paint is not None:      #if main canvas isn't erased
-            for main_canvas in scene.artist_paint: #look main canvas name
-                canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-            for mat in bpy.data.materials:
-                if mat.name == canvasName :      #if mainCanvas Mat exist
-                    for mt in obj.data.materials:
-                        if mt == canvasName: #look don't exist for this obj
-                            break
-                    obj.data.materials.append(mat) #add main canvas mat
+            if len(scene.artist_paint) !=0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                for mat in bpy.data.materials:
+                    if mat.name == canvasName :      #if mainCanvas Mat exist
+                        for mt in obj.data.materials:
+                            if mt == canvasName: #look don't exist for this obj
+                                break
+                        obj.data.materials.append(mat) #add main canvas mat
 
         context.scene.objects.active = obj.parent  #Mask parent to canvas
         if context.mode != 'PAINT_TEXTURE':
@@ -866,14 +855,15 @@ class CurvePolyinvert(Operator):
 
         bpy.ops.paint.texture_paint_toggle()     #return Paint  mode
         if scene.artist_paint is not None:      #if main canvas isn't erased
-            for main_canvas in scene.artist_paint: #look main canvas name
-                canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-            for mat in bpy.data.materials:
-                if mat.name == canvasName :      #if mainCanvas Mat exist
-                    for mt in mk.data.materials:
-                        if mt == canvasName: #look don't exist for this obj
-                            break
-                    mk.data.materials.append(mat) #add main canvas mat
+            if len(scene.artist_paint) !=0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                for mat in bpy.data.materials:
+                    if mat.name == canvasName :      #if mainCanvas Mat exist
+                        for mt in mk.data.materials:
+                            if mt == canvasName: #look don't exist for this obj
+                                break
+                        mk.data.materials.append(mat) #add main canvas mat
 
 
         context.scene.objects.active = objS  #return to the main canvas
@@ -950,7 +940,7 @@ class RotateCanvasCCW15(Operator):
         _obName = obj.name
         _camName = "Camera_" + _obName
         if guides_are_activated == True:
-            bpy.ops.artist_paint.camera_guides()
+            bpy.ops.artist_paint.guides_toggle()
             context.scene.ArtistPaint_Bool02 = True
 
         #toggle texture mode/object mode
@@ -1003,7 +993,7 @@ class RotateCanvasCW15(Operator):
         _obName = obj.name
         _camName = "Camera_" + _obName
         if guides_are_activated == True:
-            bpy.ops.artist_paint.camera_guides()
+            bpy.ops.artist_paint.guides_toggle()
             context.scene.ArtistPaint_Bool02 = True
 
         #toggle texture mode / object mode
@@ -1207,7 +1197,7 @@ class CanvasResetrot(Operator):
 
         if context.scene.ArtistPaint_Bool02 == True:
             context.scene.ArtistPaint_Bool02 = False
-            bpy.ops.artist_paint.camera_guides()
+            bpy.ops.artist_paint.guides_togle()
 
         bpy.ops.object.select_all(action='DESELECT')
         ob = bpy.data.objects[_obName]
@@ -1220,6 +1210,7 @@ class CanvasResetrot(Operator):
 ##############################################################  panel
 class ArtistPanel(Panel):
     bl_label = "Artist Paint Tools"
+    bl_idname = "ARTIST_PAINT_PT_artist_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
     bl_category = "Artist Paint 2D"
@@ -1243,16 +1234,19 @@ class ArtistPanel(Panel):
 
     def draw(self, context):
         layout = self.layout
-
-        #Init the main_canvas object
-        #layout.active
-        layout.active = layout.enabled = context.scene.UI_is_activated
-
-        #------------------------------------------
+        scene = context.scene
         addon_prefs = get_addon_preferences()
+
+        #layout.active
+        layout.active = layout.enabled = scene.UI_is_activated
+
+        #change variables with prefs
+        #------------------------------------------
         CustomAngle  = str(addon_prefs.CustomAngle)
-        guides_are_activated =  context.scene.guides_are_activated
-        bordercrop_is_activated = context.scene.bordercrop_is_activated
+        guides_are_activated =  scene.guides_are_activated
+        bordercrop_is_activated = scene.bordercrop_is_activated
+        bordercrop_is_activated = addon_prefs.Bordercrop
+        guides_are_activated = addon_prefs.Guides
         toolsettings = context.tool_settings
         ipaint = context.tool_settings.image_paint
 
@@ -1298,7 +1292,7 @@ class ArtistPanel(Panel):
             Icun = 'CLIPUV_DEHLT'
         else:
             Icun = 'MOD_LATTICE'
-        row.operator("artist_paint.camera_guides",
+        row.operator("artist_paint.guides_toggle",
                     text = "",
                     icon = Icun)
 
