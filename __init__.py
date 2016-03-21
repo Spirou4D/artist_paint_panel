@@ -86,6 +86,9 @@ bpy.types.Scene.ArtistPaint_Bool01 = \
 #bool property to use with
 bpy.types.Scene.ArtistPaint_Bool02 = \
                                 bpy.props.BoolProperty(default=False)
+#bool property to cadenas addon's prefs
+bpy.types.Scene.ArtistPaint_Bool03 = \
+                                bpy.props.BoolProperty(default=True)
 
 
 #-----------------------------------------------Preferences of add-on
@@ -161,32 +164,38 @@ class OkOperator(Operator):
     bl_label = "OK"
 
     def execute(self, context):
-        scene= context.scene
-        if scene.artist_paint is not None:
-            if len(scene.artist_paint) !=0:
-                main_canvas_0 = scene.artist_paint[0]
-                canvasName = (main_canvas_0.filename)[:-4]
+        scene = context.scene                                #init
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            if len(scene.artist_paint) !=0:      #artist_paint isn't empty
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find maincanvas's name
+                    _camName = "Camera_" + canvasName  #create canvas's camera name
+                for obj in scene.objects:
+                    if obj.name == canvasName :      #if mainCanvas Mat exist
+                        scene.objects.active = obj
+                        break
+        else:
+            return {'FINISHED'}
 
-        if  context.mode != 'OBJECT':
-            bpy.ops.paint.texture_paint_toggle()   #change to Object mode
-        for obj  in bpy.data.objects:
-            if obj.name == canvasName:
-                obj.select = True
-                context.scene.objects.active = obj
-                bpy.ops.object.select_hierarchy(direction='CHILD', \
-                                                        extend=True)
-                bpy.ops.object.delete(use_global=True)
+        context.scene.objects.active = obj
+        if obj.mode != 'OBJECT':
+            bpy.ops.paint.texture_paint_toggle()     #return in object mode
+
+        bpy.ops.object.select_hierarchy(direction='CHILD', extend=True)
+        bpy.ops.object.delete(use_global=True)
         for cam  in bpy.data.objects:
             if cam.name == "Camera_" + canvasName:
                 cam.select = True
                 context.scene.objects.active = cam
                 bpy.ops.object.delete(use_global=True)
+
         scene.artist_paint.clear()
-        context.scene.maincanvas_is_empty = True
+        scene.maincanvas_is_empty = True
 
         message = 'The canvas: "' + canvasName + \
                     '" is  removed in memory and deleted with his hierarchy.'
         self.report({'INFO'}, message)
+
         bpy.ops.artist_paint.load_init()
         return {'FINISHED'}
 
@@ -284,7 +293,10 @@ class ImageReload(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
         original_type = context.area.type
@@ -304,7 +316,10 @@ class SaveImage(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
         original_type = context.area.type
@@ -325,43 +340,63 @@ class SaveIncremImage(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
+        scene =context.scene
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            if len(scene.artist_paint) !=0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    _Ext = (main_canvas.filename)[-4:]
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                    filePATH = main_canvas.path
+                    canvasDimX = main_canvas.dimX
+                    canvasDimY =  main_canvas.dimY
+                for obj in scene.objects:
+                    if obj.name == canvasName :      #if mainCanvas Mat exist
+                        scene.objects.active = obj
+                        break
+        else:
+            return {'FINISHED'}
+        #init
+        obj = context.active_object
         original_type = context.area.type
         context.area.type = 'IMAGE_EDITOR'
 
-        #init
-        i = 1
-        obj = context.active_object
-        _obName = obj.name
-        filePATH = obj.data.materials[0].texture_slots[0].\
-                                            texture.image.filepath
-        #//../../../.config/blender/Brushes/13_Tâche_de_café/Cafeina (1).png
         filePATH = (os.path.realpath(filePATH))
         #/.config/blender/Brushes/13_Tâche_de_café/Cafeina (1).png
-        _Ext = os.path.splitext(filePATH)[1]
-        _tempName = [ _obName + '_' + '{:03d}'.format(i) + _Ext ]
+
+        _tempName = [canvasName + '_001' + _Ext]
 
         HOME = os.path.expanduser("~")
-        _Dir = os.path.dirname(filePATH)
-        #/home/patrinux/.config/blender/Brushes/13_Tâche_de_café
-
+        if filePATH.find(HOME)!=-1:
+            _Dir =  filePATH
+        else:
+            _Dir = HOME + filePATH
+        print(_Dir)
         #verify the brushname
         l = os.listdir(_Dir)
         brushesName = [ f for f in l if os.path.\
                                 isfile(os.path.join(_Dir,f)) ]
         brushesName = sorted(brushesName)
+
+        i = 1
         for x in _tempName:
             for ob in brushesName:
                 if ob == _tempName[-1]:
                     i += 1
-                    _tempName = _tempName + [_obName + '_' + \
+                    _tempName = _tempName + [canvasName + '_' + \
                                     '{:03d}'.format(i) + _Ext]
+
 
         #return image to last saved state
         chemin = os.path.join(_Dir,_tempName[-1])
-        bpy.ops.image.save_as(filepath = chemin)
+        bpy.ops.image.save_as(filepath = chemin,
+                                check_existing=False,
+                                relative_path=False)
 
         context.area.type = original_type
         return {'FINISHED'}
@@ -438,19 +473,31 @@ class CameraviewPaint(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            C = obj.mode == 'OBJECT'
+            return B and C
 
     def execute(self, context):
-        #init
-        obj = context.active_object
-        _obName = obj.name
-        _camName = "Camera_" + _obName
+        scene = context.scene                     #init
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            if len(scene.artist_paint) !=0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                    _camName = "Camera_" + canvasName
+                    canvasDimX = main_canvas.dimX
+                    canvasDimY =  main_canvas.dimY
+                for obj in scene.objects:
+                    if obj.name == canvasName :      #if mainCanvas Mat exist
+                        scene.objects.active = obj
+                        break
+        else:
+            return {'FINISHED'}
 
-        context.space_data.viewport_shade = 'TEXTURED'  #texture draw
-        context.object.active_material.use_shadeless = True #shadeless
-        #http://blender.stackexchange.com/users/660/mutant-bob
-        select_mat = obj.data.materials[0].texture_slots[0].\
-                                            texture.image.size[:]
+        obj = context.active_object
+        context.space_data.viewport_shade = 'TEXTURED'  #texture draw option
+        context.object.active_material.use_shadeless = True #shadeless option
 
         for cam  in bpy.data.objects:
             if cam.name == _camName:
@@ -460,15 +507,8 @@ class CameraviewPaint(Operator):
                                     confirm ="error.ok0" )
                 return {'FINISHED'}
 
-        bpy.ops.paint.texture_paint_toggle()   #toggle to Paint mode
-
-        #Cursor to center of world
-        bpy.ops.view3d.snap_cursor_to_center()
+        bpy.ops.view3d.snap_cursor_to_center()    #Cursor to center of world
         bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
-
-        #toggle on/off textpaint
-        if obj and (obj.mode == 'TEXTURE_PAINT'):
-            bpy.ops.paint.texture_paint_toggle()
 
         #add camera
         bpy.ops.object.camera_add(view_align=False,
@@ -480,17 +520,11 @@ class CameraviewPaint(Operator):
                                 False, False, False, False, False,
                                 False, False, False, False, False))
 
-        #ratio full
-        context.scene.render.resolution_percentage = 100
+        context.scene.render.resolution_percentage = 100   #ratio full
+        context.object.name = _camName                       #name it
+        bpy.ops.view3d.object_as_camera()         #switch to camera view
 
-        #name it
-        context.object.name = _camName
-
-        #switch to camera view
-        bpy.ops.view3d.object_as_camera()
-
-        #ortho view on current camera
-        context.object.data.type = 'ORTHO'
+        context.object.data.type = 'ORTHO'      #ortho view 4 cam
         context.object.data.dof_object= obj
 
         #move cam up in Z by 1 unit
@@ -507,27 +541,24 @@ class CameraviewPaint(Operator):
 
         #resolution
         rnd = bpy.data.scenes[0].render
-        rndx = rnd.resolution_x = select_mat[0]
-        rndy = rnd.resolution_y = select_mat[1]
+        rndx = rnd.resolution_x = canvasDimX
+        rndy = rnd.resolution_y = canvasDimY
 
-        #orthoscale = ((rndx - rndy)/rndy)+1
+        #orthoscale
         if rndx >= rndy:
-            orthoscale = ((rndx - rndy)/rndy)+1
-        elif rndx < rndy:
+            orthoscale =  rndx / rndy
+        else:
             orthoscale = 1
         context.object.data.ortho_scale = orthoscale
 
-        #Init Selection
         bpy.ops.object.select_all(action='TOGGLE')
-        bpy.ops.object.select_all(action='DESELECT')
+        bpy.ops.object.select_all(action='DESELECT')  #init Selection
 
-        #select plane
-        ob = bpy.data.objects[_obName]
-        ob.select = True
-        context.scene.objects.active = ob
-
-        #selection to texpaint toggle
+        #select canvas
+        obj.select = True
+        context.scene.objects.active = obj
         bpy.ops.paint.texture_paint_toggle()
+        scene.game_settings.material_mode = 'GLSL'
         return {'FINISHED'}
 
 
@@ -576,14 +607,16 @@ class BorderCropToggle(Operator):
         return A
 
     def execute(self, context):
-        bordercrop_is_activated = context.scene.bordercrop_is_activated
+        scene = context.scene
+        bordercrop_is_activated = scene.bordercrop_is_activated
 
-        if bordercrop_is_activated:
-            bpy.ops.artist_paint.border_uncrop()
-            context.scene.bordercrop_is_activated = False
-        else:
-            bpy.ops.artist_paint.border_crop()
-            context.scene.bordercrop_is_activated = True
+        if scene.ArtistPaint_Bool03:
+            if bordercrop_is_activated:
+                bpy.ops.artist_paint.border_uncrop()
+                bordercrop_is_activated = False
+            else:
+                bpy.ops.artist_paint.border_crop()
+                bordercrop_is_activated = True
         return {'FINISHED'}
 
 
@@ -598,7 +631,6 @@ class CamGuides(Operator):
 
     def execute(self, context):
         scene = context.scene
-        guides_are_activated = context.scene.guides_are_activated
 
         if scene.artist_paint is not None:      #if main canvas isn't erased
             if len(scene.artist_paint) != 0:
@@ -610,12 +642,13 @@ class CamGuides(Operator):
 
         for cam in bpy.data.objects :
             if cam.name == _camName:
-                if cam.data.show_guide == set() or not(guides_are_activated): #True = guides not visible
-                    cam.data.show_guide = {'CENTER', 'THIRDS', 'CENTER_DIAGONAL'}
-                    context.scene.guides_are_activated = True
-                elif guides_are_activated:
-                    cam.data.show_guide = set() #False = guides visible
-                    context.scene.guides_are_activated = False
+                if not(scene.ArtistPaint_Bool03):
+                    if cam.data.show_guide == set(): #True = guides not visible
+                        cam.data.show_guide = {'CENTER', 'THIRDS', 'CENTER_DIAGONAL'}
+                        scene.guides_are_activated = True
+                    else:
+                        cam.data.show_guide = set() #False = guides visible
+                        scene.guides_are_activated = False
         return {'FINISHED'}
 
 
@@ -629,7 +662,6 @@ class TraceSelection(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-
         if obj is not None:
             A = context.mode == 'PAINT_TEXTURE'
             B = obj.type == 'MESH'
@@ -664,6 +696,7 @@ class TraceSelection(Operator):
                     lrs.append(lay)
         cv = lrs[-1]          #select the alone 'GP_Layer' curve object
         scene.objects.active = cv                      #active it
+        cv.name = "+ Mask"
         objProp.origin_set(type='ORIGIN_GEOMETRY') #origine to geometry
 
         objProp.editmode_toggle()             #return curve edit mode
@@ -743,7 +776,7 @@ class CurvePoly2d(Operator):
                                     xmirror=False,
                                     keep_transform=False)
         context.scene.objects.active = cv
-        cv.name = "Mask"
+        cv.name = "+ Mask"
         objProp.editmode_toggle()                 #toggle curve edit
         cvProp.vertex_add()
         cvProp.handle_type_set(type='VECTOR')
@@ -752,7 +785,7 @@ class CurvePoly2d(Operator):
 
 
 #-----------------------------------------------close, mesh and unwrap
-class CloseCurveunwrap(Operator):
+class CloseCurveUnwrap(Operator):
     """Close the curve, set to mesh and unwrap"""
     bl_description = "Convert Vector to Mesh"
     bl_idname = "artist_paint.curve_unwrap"
@@ -787,7 +820,7 @@ class CloseCurveunwrap(Operator):
         bpy.ops.mesh.normals_make_consistent(inside=False)#Normals ouside
         bpy.ops.uv.project_from_view(correct_aspect=False)#uv cam unwrap
         objProp.editmode_toggle()               #toggle object mode
-        obj.name = "+ " + _cvName              #name the new mask
+        obj.name = _cvName              #name the new mask
 
         bpy.ops.paint.texture_paint_toggle()    #return in paint mode
         if scene.artist_paint is not None:      #if main canvas isn't erased
@@ -808,7 +841,7 @@ class CloseCurveunwrap(Operator):
 
 
 #-------------------------------------------Invert all mesh mask
-class CurvePolyinvert(Operator):
+class CurvePolyInvert(Operator):
     """Inverte Mesh Mask in Object mode only"""
     bl_idname = "artist_paint.inverted_mask"
     bl_description = "Inverte Mesh Mask"
@@ -887,7 +920,10 @@ class CanvasHoriz(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
         bpy.ops.paint.texture_paint_toggle()     #toggle Object mode
@@ -909,7 +945,10 @@ class CanvasVertical(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
         bpy.ops.paint.texture_paint_toggle()    #toggle Object mode
@@ -985,7 +1024,10 @@ class RotateCanvasCW15(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
         addon_prefs = get_addon_preferences()
@@ -1037,7 +1079,10 @@ class RotateCanvasCCW(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
         _bool01 = context.scene.ArtistPaint_Bool01
@@ -1102,7 +1147,10 @@ class RotateCanvasCW(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
         _bool01 = context.scene.ArtistPaint_Bool01
@@ -1168,27 +1216,38 @@ class CanvasResetrot(Operator):
     @classmethod
     def poll(self, context):
         obj =  context.active_object
-        return obj is not None and context.active_object.type == 'MESH'
+        A = obj is not None
+        if A:
+            B = obj.type == 'MESH'
+            return B
 
     def execute(self, context):
-        #init
+        scene = context.scene                             #init
+        tool_settings = scene.tool_settings
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            if len(scene.artist_paint) !=0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                    _camName = "Camera_" + canvasName
+                    canvasDimX = main_canvas.dimX
+                    canvasDimY =  main_canvas.dimY
+                for obj in scene.objects:
+                    if obj.name == canvasName :      #if mainCanvas Mat exist
+                        scene.objects.active = obj
+                        break
+        else:
+            return {'FINISHED'}
         obj = context.active_object
-        _obName = obj.name
-        _camName = "Camera_" + _obName
-        #http://blender.stackexchange.com/users/660/mutant-bob
-        #(988, 761) X select_mat[0] Y select_mat[1]
-        select_mat = obj.data.materials[0].texture_slots[0].\
-                                            texture.image.size[:]
 
-        if select_mat[0] >= select_mat[1]:
-            camRatio = select_mat[0]/select_mat[1]
+        if canvasDimX >= canvasDimY:
+            camRatio = canvasDimX/canvasDimY
         else:
             camRatio = 1
 
         #resolution
         rnd = context.scene.render
-        rnd.resolution_x= select_mat[0]
-        rnd.resolution_y= select_mat[1]
+        rnd.resolution_x= canvasDimX
+        rnd.resolution_y= canvasDimY
 
         #reset canvas rotation
         bpy.ops.object.rotation_clear()
@@ -1202,12 +1261,11 @@ class CanvasResetrot(Operator):
 
         if context.scene.ArtistPaint_Bool02 == True:
             context.scene.ArtistPaint_Bool02 = False
-            bpy.ops.artist_paint.guides_togle()
+            bpy.ops.artist_paint.guides_toggle()
 
         bpy.ops.object.select_all(action='DESELECT')
-        ob = bpy.data.objects[_obName]
-        ob.select = True
-        context.scene.objects.active = ob
+        obj.select = True
+        context.scene.objects.active = obj
         return {'FINISHED'}
 
 
@@ -1247,11 +1305,13 @@ class ArtistPanel(Panel):
 
         #change variables with prefs
         #------------------------------------------
-        CustomAngle  = str(addon_prefs.CustomAngle)
-        guides_are_activated =  scene.guides_are_activated
         bordercrop_is_activated = scene.bordercrop_is_activated
-        bordercrop_is_activated = addon_prefs.Bordercrop
-        guides_are_activated = addon_prefs.Guides
+        guides_are_activated =  scene.guides_are_activated
+        if scene.ArtistPaint_Bool03:
+            bordercrop_is_activated = addon_prefs.Bordercrop
+            guides_are_activated = addon_prefs.Guides
+
+        CustomAngle  = str(addon_prefs.CustomAngle)
         toolsettings = context.tool_settings
         ipaint = context.tool_settings.image_paint
 
@@ -1281,19 +1341,20 @@ class ArtistPanel(Panel):
                 icon='OUTLINER_OB_CAMERA')
 
         col.separator()
-
+        col.prop(context.scene, "ArtistPaint_Bool03", \
+                                            text = "Prefs Cadenas")
         row = col.row(align = True)
         row.operator("artist_paint.cameraview_paint",
                     text = "Set Shadeless Painting Camera",
                     icon = 'RENDER_REGION')
-        if bordercrop_is_activated==True:
+        if bordercrop_is_activated:
             Icon = 'CLIPUV_DEHLT'
         else:
             Icon = 'BORDER_RECT'
         row.operator("artist_paint.border_toggle",
                     text = "",
                     icon = Icon)
-        if guides_are_activated==True:
+        if guides_are_activated:
             Icun = 'CLIPUV_DEHLT'
         else:
             Icun = 'MOD_LATTICE'
