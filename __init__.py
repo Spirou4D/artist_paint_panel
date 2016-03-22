@@ -615,20 +615,33 @@ class BorderCropToggle(Operator):
         rs = context.scene.render
 
         if not(scene.ArtistPaint_Bool03):
-            print("debut "+ str(bordercrop_is_activated))
-
             if rs.use_border and rs.use_crop_to_border:
                 bpy.ops.artist_paint.border_uncrop()
                 bordercrop_is_activated = False
-                print("1 "+ str(bordercrop_is_activated))
             else:
                 bpy.ops.artist_paint.border_crop()
                 bordercrop_is_activated = True
-                print("2 " + str(bordercrop_is_activated))
-
-            print("end "+ str(bordercrop_is_activated))
         return {'FINISHED'}
 
+
+#-------------------------------------------------Prefs toogle button
+class PrefsLockToggle(Operator):
+    """Lock bordercrop & guides preferences in viewport"""
+    bl_description = "Prefs lock On/Off TOGGLE"
+    bl_idname = "artist_paint.prefs_lock_toggle"
+    bl_label = ""
+    bl_options = {'REGISTER','UNDO'}
+
+
+    def execute(self, context):
+        scene = context.scene
+        prefs_lock = scene.ArtistPaint_Bool03
+
+        if prefs_lock:
+            scene.ArtistPaint_Bool03 = False
+        else:
+            scene.ArtistPaint_Bool03 = True
+        return {'FINISHED'}
 
 #-------------------------------------------------camera guides
 class CamGuides(Operator):
@@ -1371,8 +1384,6 @@ class ArtistPanel(Panel):
                 icon='OUTLINER_OB_CAMERA')
 
         col.separator()
-        col.prop(context.scene, "ArtistPaint_Bool03", \
-                                            text = "Prefs Cadenas")
         row = col.row(align = True)
         row.operator("artist_paint.cameraview_paint",
                     text = "Set Shadeless Painting Camera",
@@ -1393,6 +1404,15 @@ class ArtistPanel(Panel):
         row.operator("artist_paint.guides_toggle",
                     text = "",
                     icon = Icun)
+
+        PLB = scene.ArtistPaint_Bool03
+        if PLB:
+            Ican = 'LOCKED'
+        else:
+            Ican = 'UNLOCKED'
+        row.operator("artist_paint.prefs_lock_toggle",
+                    text = "",
+                    icon = Ican)
 
         col.separator()
 
