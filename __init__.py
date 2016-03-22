@@ -68,13 +68,14 @@ class SceneCustomCanvas(bpy.types.PropertyGroup):
     dimY = bpy.props.IntProperty(name="Test Prop", default=0)
 bpy.utils.register_class(SceneCustomCanvas)
 
-
 bpy.types.Scene.artist_paint = \
                     bpy.props.CollectionProperty(type=SceneCustomCanvas)
+
+
 bpy.types.Scene.UI_is_activated = \
-                    bpy.props.BoolProperty(default=False)
+                            bpy.props.BoolProperty(default=False)
 bpy.types.Scene.maincanvas_is_empty = \
-                    bpy.props.BoolProperty(default=True)
+                            bpy.props.BoolProperty(default=True)
 bpy.types.Scene.bordercrop_is_activated = \
                             bpy.props.BoolProperty(default=False)
 bpy.types.Scene.guides_are_activated = \
@@ -83,7 +84,7 @@ bpy.types.Scene.guides_are_activated = \
 #bool property to use costraint rotation
 bpy.types.Scene.ArtistPaint_Bool01 = \
                                 bpy.props.BoolProperty(default=False)
-#bool property to use with
+#bool property to use with resetrotation
 bpy.types.Scene.ArtistPaint_Bool02 = \
                                 bpy.props.BoolProperty(default=False)
 #bool property to cadenas addon's prefs
@@ -138,15 +139,27 @@ class MessageOperator(Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        return wm.invoke_popup(self, width=500, height=200)
+        return wm.invoke_popup(self, width=200, height=300)
 
     def draw(self, context):
         layout = self.layout
-        layout.label("                                      WARNING!")
-        row = layout.row(align=True)
-        row.label(self.message)
+        layout.label("**** WARNING! ****")
+        message = "   " + self.message
+        line = int(round(float(len(message))/32)) + 1
+        n=1
+        while (n <= line):
+            X = (n-1)*32
+            Z = n*32
+            content = message[X:Z]
+            row = layout.row(align=True)
+            row.label(content)
+            n += 1
+        else:
+            print("c'est fini")
+
         layout.separator()
         row = layout.row(align=True)
+
         row.operator(self.confirm)
 
 #-----------------------------The OK button in the error dialog
@@ -264,14 +277,12 @@ class ArtistPaintLoad(Operator):
         select_mat = obj.data.materials[0].texture_slots[0].\
                                             texture.image.size[:]
 
-
         main_canvas= bpy.context.scene.artist_paint.add()
-        context.scene.maincanvas_is_empty = False
         main_canvas.filename = fileName
         main_canvas.path = fileDIR
         main_canvas.dimX = select_mat[0]
         main_canvas.dimY = select_mat[1]
-
+        context.scene.maincanvas_is_empty = False
 
         for main_canvas in bpy.context.scene.artist_paint:
             print(main_canvas.filename)
@@ -536,9 +547,6 @@ class CameraviewPaint(Operator):
                     proportional_edit_falloff='SMOOTH',
                     proportional_size=1)
 
-        #switch on composition guides for use in cameraview paint
-        context.object.data.show_guide = set()
-
         #resolution
         rnd = bpy.data.scenes[0].render
         rndx = rnd.resolution_x = canvasDimX
@@ -571,9 +579,9 @@ class BorderCrop(Operator):
     bl_options = {'REGISTER','UNDO'}
 
     def execute(self, context):
-        render = context.scene.render
-        render.use_border = True
-        render.use_crop_to_border = True
+        rs = context.scene.render
+        rs.use_border = True
+        rs.use_crop_to_border = True
         return {'FINISHED'}
 
 
@@ -586,37 +594,39 @@ class BorderUnCrop(Operator):
     bl_options = {'REGISTER','UNDO'}
 
     def execute(self, context):
-        render = context.scene.render
-        render.use_border = False
-        render.use_crop_to_border = False
+        rs = context.scene.render
+        rs.use_border = False
+        rs.use_crop_to_border = False
         return {'FINISHED'}
 
 
 #-------------------------------------------------border crop on
 class BorderCropToggle(Operator):
     """Set Border Crop in Render Settings"""
-    bl_description = "Set Border Crop in Render Settings"
+    bl_description = "Border Crop On/Off TOGGLE"
     bl_idname = "artist_paint.border_toggle"
     bl_label = ""
     bl_options = {'REGISTER','UNDO'}
 
-    @classmethod
-    def poll(self, context):
-        rs = context.scene.render
-        A = context.mode == 'PAINT_TEXTURE'
-        return A
 
     def execute(self, context):
         scene = context.scene
         bordercrop_is_activated = scene.bordercrop_is_activated
+        rs = context.scene.render
 
-        if scene.ArtistPaint_Bool03:
-            if bordercrop_is_activated:
+        if not(scene.ArtistPaint_Bool03):
+            print("debut "+ str(bordercrop_is_activated))
+
+            if rs.use_border and rs.use_crop_to_border:
                 bpy.ops.artist_paint.border_uncrop()
                 bordercrop_is_activated = False
+                print("1 "+ str(bordercrop_is_activated))
             else:
                 bpy.ops.artist_paint.border_crop()
                 bordercrop_is_activated = True
+                print("2 " + str(bordercrop_is_activated))
+
+            print("end "+ str(bordercrop_is_activated))
         return {'FINISHED'}
 
 
@@ -637,8 +647,8 @@ class CamGuides(Operator):
                 for main_canvas in scene.artist_paint: #look main canvas name
                     canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
                     _camName = "Camera_" + canvasName
-            else:
-                return {'FINISHED'}
+        else:
+            return {'FINISHED'}
 
         for cam in bpy.data.objects :
             if cam.name == _camName:
@@ -977,15 +987,17 @@ class RotateCanvasCCW15(Operator):
         addon_prefs = get_addon_preferences()
         CustomAngle = math.radians(addon_prefs.CustomAngle)
         _bool01 = context.scene.ArtistPaint_Bool01
+        _bool02 = context.scene.ArtistPaint_Bool02
         guides_are_activated =  context.scene.guides_are_activated
 
         #init
         obj = context.active_object
         _obName = obj.name
         _camName = "Camera_" + _obName
-        if guides_are_activated == True:
+
+        if guides_are_activated == True:             #remove guides
             bpy.ops.artist_paint.guides_toggle()
-            context.scene.ArtistPaint_Bool02 = True
+            _bool02 = True
 
         #toggle texture mode/object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -994,7 +1006,8 @@ class RotateCanvasCCW15(Operator):
         bpy.ops.transform.rotate(value=CustomAngle,
                         axis=(0, 0, 1),
                         constraint_axis=(False, False, True))
-        if _bool01 == True:
+
+        if _bool01 == True:                     #option Frame contraint
             bpy.ops.view3d.camera_to_view_selected()
 
         for cam  in bpy.data.objects:
@@ -1034,14 +1047,16 @@ class RotateCanvasCW15(Operator):
         CustomAngle = math.radians(addon_prefs.CustomAngle)
         guides_are_activated =  context.scene.guides_are_activated
         _bool01 = context.scene.ArtistPaint_Bool01
+        _bool02 = context.scene.ArtistPaint_Bool02
 
         #init
         obj = context.active_object
         _obName = obj.name
         _camName = "Camera_" + _obName
-        if guides_are_activated == True:
+
+        if guides_are_activated == True:              #remove guides
             bpy.ops.artist_paint.guides_toggle()
-            context.scene.ArtistPaint_Bool02 = True
+            _bool02 = True
 
         #toggle texture mode / object mode
         bpy.ops.paint.texture_paint_toggle()
@@ -1050,14 +1065,14 @@ class RotateCanvasCW15(Operator):
         bpy.ops.transform.rotate(value=-(CustomAngle),
                                 axis=(0, 0, 1),
                                 constraint_axis=(False, False, True))
-        if _bool01 ==True:
+
+        if _bool01 ==True:                     #option Frame contraint
             bpy.ops.view3d.camera_to_view_selected()
 
         for cam  in bpy.data.objects:
             if cam.name == _camName:
                 cam.select = True
                 context.scene.objects.active = cam
-
 
         bpy.ops.object.select_all(action='DESELECT')
         ob = bpy.data.objects[_obName]
@@ -1189,6 +1204,7 @@ class RotateCanvasCW(Operator):
                     proportional='DISABLED',
                     proportional_edit_falloff='SMOOTH',
                     proportional_size=1)
+
         if _bool01 == True:
             bpy.ops.view3d.camera_to_view_selected()
 
@@ -1273,19 +1289,14 @@ class CanvasResetrot(Operator):
 ##############################################################  panel
 class ArtistPanel(Panel):
     bl_label = "Artist Paint Tools"
-    bl_idname = "ARTIST_PAINT_PT_artist_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
     bl_category = "Artist Paint 2D"
 
 
-
     @classmethod
     def poll(self, cls):
         return bpy.context.scene.render.engine == 'BLENDER_RENDER'
-
-    def check(self, context):
-        return True
 
     def draw_header(self, context):
         if context.scene.UI_is_activated:
@@ -1307,9 +1318,28 @@ class ArtistPanel(Panel):
         #------------------------------------------
         bordercrop_is_activated = scene.bordercrop_is_activated
         guides_are_activated =  scene.guides_are_activated
+
+        GAA = BIA = False
+        if scene.artist_paint is not None:      #if main canvas isn't erased
+            if len(scene.artist_paint) != 0:
+                for main_canvas in scene.artist_paint: #look main canvas name
+                    canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                    _camName = "Camera_" + canvasName
+                for cam in bpy.data.objects :
+                    if cam.name == _camName:
+                        if cam.data.show_guide == set(): #True = guides not visible
+                            GAA = False
+                        else:
+                            GAA = True
+                rs = context.scene.render
+                if rs.use_border or rs.use_crop_to_border:
+                    BIA = True
+                else:
+                    BIA = False
+
         if scene.ArtistPaint_Bool03:
-            bordercrop_is_activated = addon_prefs.Bordercrop
-            guides_are_activated = addon_prefs.Guides
+            BIA = addon_prefs.Bordercrop
+            GAA = addon_prefs.Guides
 
         CustomAngle  = str(addon_prefs.CustomAngle)
         toolsettings = context.tool_settings
@@ -1347,14 +1377,16 @@ class ArtistPanel(Panel):
         row.operator("artist_paint.cameraview_paint",
                     text = "Set Shadeless Painting Camera",
                     icon = 'RENDER_REGION')
-        if bordercrop_is_activated:
+
+        if BIA:
             Icon = 'CLIPUV_DEHLT'
         else:
             Icon = 'BORDER_RECT'
         row.operator("artist_paint.border_toggle",
                     text = "",
                     icon = Icon)
-        if guides_are_activated:
+
+        if GAA:
             Icun = 'CLIPUV_DEHLT'
         else:
             Icun = 'MOD_LATTICE'
