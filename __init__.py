@@ -52,13 +52,13 @@ SEP = os.sep
 ########################
 #-------------------------------------------get the addon preferences
 def get_addon_preferences():
-	#bpy.context.user_preferences.addons["notify_after_render"].preferences['sent_sms']=1
-	#Par exemple:
-	# addon_prefs = get_addon_preferences()
-	# addon_prefs.url_smsservice
+    #bpy.context.user_preferences.addons["notify_after_render"].preferences['sent_sms']=1
+    #Par exemple:
+    # addon_prefs = get_addon_preferences()
+    # addon_prefs.url_smsservice
 
-	addon_preferences = bpy.context.user_preferences.addons[__name__].preferences
-	return addon_preferences
+    addon_preferences = bpy.context.user_preferences.addons[__name__].preferences
+    return addon_preferences
 
 #-------------------------------------------get the main canvas datas
 def MainCanvasData(self, context):
@@ -491,6 +491,94 @@ class BrushMakerScene(Operator):
                 override['area'] = area
                 bpy.ops.view3d.viewnumpad(override, type = 'CAMERA')
                 break # this will break the loop after the first ran
+        return {'FINISHED'}
+
+
+#-------------------------------------------------Front of CCW15 Rot
+class FrontOfCCW(Operator):
+    """front of face CCW15 rotate"""
+    bl_description = ""
+    bl_idname = "artist_paint.frontof_ccw"
+    bl_label = "Front Of CCW15 rotation"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        obj =  context.active_object
+        if obj is not None:
+            A = context.mode == 'PAINT_TEXTURE'
+            B = obj.type == 'MESH'
+            return A and B
+
+    def execute(self, context):
+        #init
+        paint = bpy.ops.paint
+        addon_prefs = get_addon_preferences()
+        CustomAngle = math.radians(addon_prefs.customAngle)
+
+        paint.texture_paint_toggle()        #return in object mode
+        bpy.ops.transform.rotate(value=-CustomAngle)
+        paint.texture_paint_toggle()        #return in paint mode
+        return {'FINISHED'}
+
+
+#-------------------------------------------------Front of paint
+class FrontOfPaint(Operator):
+    """fast front of face view paint"""
+    bl_description = ""
+    bl_idname = "artist_paint.frontof_paint"
+    bl_label = "Front Of Paint"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        obj =  context.active_object
+        if obj is not None:
+            A = context.mode == 'PAINT_TEXTURE'
+            B = obj.type == 'MESH'
+            return A and B
+
+    def execute(self, context):
+        #init
+        paint = bpy.ops.paint
+        object = bpy.ops.object
+        contextObj = context.object
+
+        context.space_data.viewport_shade = 'TEXTURED'  #texture draw
+        paint.texture_paint_toggle()
+        object.editmode_toggle()
+        bpy.ops.view3d.viewnumpad(type='TOP', align_active=True)
+        object.editmode_toggle()
+        paint.texture_paint_toggle()
+        contextObj.data.use_paint_mask = True
+        return {'FINISHED'}
+
+
+#-------------------------------------------------Front of CW15 Rot
+class FrontOfCW(Operator):
+    """fast front of face CW15 rotate"""
+    bl_description = ""
+    bl_idname = "artist_paint.frontof_cw"
+    bl_label = "Front Of CW15 rotation"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        obj =  context.active_object
+        if obj is not None:
+            A = context.mode == 'PAINT_TEXTURE'
+            B = obj.type == 'MESH'
+            return A and B
+
+    def execute(self, context):
+        #init
+        paint = bpy.ops.paint
+        addon_prefs = get_addon_preferences()
+        CustomAngle = math.radians(addon_prefs.customAngle)
+
+        paint.texture_paint_toggle()        #return in object mode
+        bpy.ops.transform.rotate(value=+CustomAngle)
+        paint.texture_paint_toggle()        #return in paint mode
         return {'FINISHED'}
 
 
@@ -1390,6 +1478,8 @@ class ArtistPanel(Panel):
         scene = context.scene
         rs = scene.render
         addon_prefs = get_addon_preferences()
+        buttName_1 = str(addon_prefs.customAngle) +"°"
+        buttName_2 = str(addon_prefs.customAngle) +"°"
 
         #layout.active
         layout = self.layout
@@ -1431,7 +1521,7 @@ class ArtistPanel(Panel):
         box.label(text="Image State")                #IMAGE STATE
         col = box.column(align = True)
         row = col.row(align = True)
-        row.operator("artist_paint.canvas_load", \
+        row.operator("artist_paint.canvas_load",
                     text = "Import canvas", icon = 'IMAGE_COL')
         row.operator("artist_paint.reload_saved_state",
                                         icon = 'LOAD_FACTORY')
@@ -1441,16 +1531,30 @@ class ArtistPanel(Panel):
                     text = "Save/Overwrite", icon = 'IMAGEFILE')
         row.operator("artist_paint.save_increm",
                     text = "Incremental Save", icon = 'SAVE_COPY')
-        col.operator("render.opengl", \
+        col.operator("render.opengl",
                     text = "Snapshot", icon = 'RENDER_STILL')
 
         box = layout.box()                             #MACRO
         col = box.column(align = True)
-        col.label(text="Special Macros")
+        col.label(text="Special Macros") #ara
         col.operator("artist_paint.create_brush_scene",
                 text="Create Brush Maker Scene",
                 icon='OUTLINER_OB_CAMERA')
 
+        row = col.row(align = True)
+        row1 = row.split(align=True)
+        row1.operator("artist_paint.frontof_ccw",
+                text="-"+buttName_1, icon = 'TRIA_LEFT')
+        row1.scale_x = 0.40
+        row2 = row.split(align=True)
+        row2.operator("artist_paint.frontof_paint",
+                text = "ALign selection in front",
+                icon = 'ERROR')
+
+        row3 = row.split(align=True)
+        row3.operator("artist_paint.frontof_cw",
+                 text= "+"+buttName_2, icon = 'TRIA_RIGHT')
+        row3.scale_x = 0.40
         col.separator()
         row = col.row(align = True)
         row.operator("artist_paint.cameraview_paint",
@@ -1539,12 +1643,10 @@ class ArtistPanel(Panel):
         row = col.row(align = True)                    #ROTATION
         row.label(text="Rotation")
         row = col.row(align = True)
-        buttName_1 = "Rotate " + str(addon_prefs.customAngle) +"° CCW"
-        buttName_2 = "Rotate " + str(addon_prefs.customAngle) +"° CW"
         row.operator("artist_paint.rotate_ccw_15",
-                    text = buttName_1, icon = 'TRIA_LEFT')
+                    text = "Rotate -" + buttName_1, icon = 'TRIA_LEFT')
         row.operator("artist_paint.rotate_cw_15",
-                    text = buttName_2, icon = 'TRIA_RIGHT')
+                    text = "Rotate +" + buttName_2, icon = 'TRIA_RIGHT')
 
         row = col.row(align = True)
         row.operator("artist_paint.rotate_ccw_90",
@@ -1617,7 +1719,6 @@ def register():
 def unregister():
     bpy.utils.unregister_class(ArtistPaintPanelPrefs)
     bpy.utils.unregister_module(__name__)
-
 
 
 if __name__ == "__main__":
