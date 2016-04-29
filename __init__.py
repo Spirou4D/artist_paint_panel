@@ -1548,9 +1548,8 @@ class ArtistPanel(Panel):
         row1.scale_x = 0.40
         row2 = row.split(align=True)
         row2.operator("artist_paint.frontof_paint",
-                text = "ALign selection in front",
+                text = "View Align 3D",
                 icon = 'ERROR')
-
         row3 = row.split(align=True)
         row3.operator("artist_paint.frontof_cw",
                  text= "+"+buttName_2, icon = 'TRIA_RIGHT')
