@@ -592,12 +592,20 @@ class CameraviewPaint(Operator):
 
     @classmethod
     def poll(self, context):
+        scene = context.scene
         obj =  context.active_object
-        A = obj is not None
-        if A:
-            B = obj.type == 'MESH'
-            C = obj.mode == 'OBJECT'
-            return B and C
+        empty = scene.maincanvas_is_empty
+        main_canvas_name = ""
+
+        if not(empty):
+            if scene.artist_paint is not None:
+                if len(scene.artist_paint) !=0:
+                    for main_canvas in scene.artist_paint: #look main canvas name
+                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+        print("result= " + str(main_canvas_name))
+
+        if obj is not None:
+            return obj.name == main_canvas_name
 
     def execute(self, context):
         scene = context.scene                     #init
@@ -717,6 +725,22 @@ class BorderCropToggle(Operator):
     bl_label = ""
     bl_options = {'REGISTER','UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        scene = context.scene
+        obj =  context.active_object
+        empty = scene.maincanvas_is_empty
+        main_canvas_name = ""
+
+        if not(empty):
+            if scene.artist_paint is not None:
+                if len(scene.artist_paint) !=0:
+                    for main_canvas in scene.artist_paint: #look main canvas name
+                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+        print("result= " + str(main_canvas_name))
+
+        if obj is not None:
+            return obj.name == main_canvas_name
 
     def execute(self, context):
         scene = context.scene
@@ -742,6 +766,22 @@ class CamGuides(Operator):
     bl_label = ""
     bl_options = {'REGISTER','UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        scene = context.scene
+        obj =  context.active_object
+        empty = scene.maincanvas_is_empty
+        main_canvas_name = ""
+
+        if not(empty):
+            if scene.artist_paint is not None:
+                if len(scene.artist_paint) !=0:
+                    for main_canvas in scene.artist_paint: #look main canvas name
+                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+        print("result= " + str(main_canvas_name))
+
+        if obj is not None:
+            return obj.name == main_canvas_name
 
     def execute(self, context):
         scene = context.scene
@@ -775,6 +815,22 @@ class PrefsLockToggle(Operator):
     bl_label = ""
     bl_options = {'REGISTER','UNDO'}
 
+    @classmethod
+    def poll(self, context):
+        scene = context.scene
+        obj =  context.active_object
+        empty = scene.maincanvas_is_empty
+        main_canvas_name = ""
+
+        if not(empty):
+            if scene.artist_paint is not None:
+                if len(scene.artist_paint) !=0:
+                    for main_canvas in scene.artist_paint: #look main canvas name
+                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+        print("result= " + str(main_canvas_name))
+
+        if obj is not None:
+            return obj.name == main_canvas_name
 
     def execute(self, context):
         scene = context.scene
