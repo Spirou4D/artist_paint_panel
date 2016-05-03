@@ -33,6 +33,7 @@ bl_info = {"name": "Paint Artist Panel",
 '''
 Modif: 2016-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 Modif: 2016-02'01 Patrick optimize the code
+Modif: 2016-04-03 security poll for functions
 '''
 
 import bpy
