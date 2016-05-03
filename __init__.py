@@ -33,7 +33,6 @@ bl_info = {"name": "Paint Artist Panel",
 '''
 Modif: 2016-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 Modif: 2016-02'01 Patrick optimize the code
-Modif: 2016-04-03 security poll for functions
 '''
 
 import bpy
@@ -518,7 +517,8 @@ class FrontOfCCW(Operator):
         CustomAngle = math.radians(addon_prefs.customAngle)
 
         paint.texture_paint_toggle()        #return in object mode
-        bpy.ops.transform.rotate(value=-CustomAngle)
+        bpy.ops.transform.rotate(value=-CustomAngle,
+                                constraint_orientation='NORMAL')
         paint.texture_paint_toggle()        #return in paint mode
         return {'FINISHED'}
 
@@ -578,7 +578,8 @@ class FrontOfCW(Operator):
         CustomAngle = math.radians(addon_prefs.customAngle)
 
         paint.texture_paint_toggle()        #return in object mode
-        bpy.ops.transform.rotate(value=+CustomAngle)
+        bpy.ops.transform.rotate(value=+CustomAngle,
+                            constraint_orientation='NORMAL')
         paint.texture_paint_toggle()        #return in paint mode
         return {'FINISHED'}
 
@@ -601,9 +602,8 @@ class CameraviewPaint(Operator):
         if not(empty):
             if scene.artist_paint is not None:
                 if len(scene.artist_paint) !=0:
-                    for main_canvas in scene.artist_paint: #look main canvas name
-                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-        print("result= " + str(main_canvas_name))
+                    for main_canvas in scene.artist_paint:
+                        main_canvas_name = (main_canvas.filename)[:-4]
 
         if obj is not None:
             return obj.name == main_canvas_name
@@ -736,9 +736,8 @@ class BorderCropToggle(Operator):
         if not(empty):
             if scene.artist_paint is not None:
                 if len(scene.artist_paint) !=0:
-                    for main_canvas in scene.artist_paint: #look main canvas name
-                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-        print("result= " + str(main_canvas_name))
+                    for main_canvas in scene.artist_paint:
+                        main_canvas_name = (main_canvas.filename)[:-4]
 
         if obj is not None:
             return obj.name == main_canvas_name
@@ -777,9 +776,8 @@ class CamGuides(Operator):
         if not(empty):
             if scene.artist_paint is not None:
                 if len(scene.artist_paint) !=0:
-                    for main_canvas in scene.artist_paint: #look main canvas name
-                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-        print("result= " + str(main_canvas_name))
+                    for main_canvas in scene.artist_paint:
+                        main_canvas_name = (main_canvas.filename)[:-4]
 
         if obj is not None:
             return obj.name == main_canvas_name
@@ -826,9 +824,8 @@ class PrefsLockToggle(Operator):
         if not(empty):
             if scene.artist_paint is not None:
                 if len(scene.artist_paint) !=0:
-                    for main_canvas in scene.artist_paint: #look main canvas name
-                        main_canvas_name = (main_canvas.filename)[:-4]   #find the name of the maincanvas
-        print("result= " + str(main_canvas_name))
+                    for main_canvas in scene.artist_paint:
+                        main_canvas_name = (main_canvas.filename)[:-4]
 
         if obj is not None:
             return obj.name == main_canvas_name
@@ -1044,12 +1041,24 @@ class CloseCurveUnwrap(Operator):
             if len(scene.artist_paint) !=0:
                 for main_canvas in scene.artist_paint: #look main canvas name
                     canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
+                    canvasDimX = main_canvas.dimX
+                    canvasDimY =  main_canvas.dimY
                 for mat in bpy.data.materials:
                     if mat.name == canvasName :      #if mainCanvas Mat exist
                         for mt in obj.data.materials:
                             if mt == canvasName: #look don't exist for this obj
                                 break
                         obj.data.materials.append(mat) #add main canvas mat
+
+                        paint = bpy.ops.paint
+                        paint.add_texture_paint_slot(type='DIFFUSE_COLOR',
+                                                    name=_cvName,
+                                                    width=canvasDimX,
+                                                    height=canvasDimY,
+                                                    color=(1, 1, 1, 0),
+                                                    alpha=True,
+                                                    generated_type='BLANK',
+                                                    float=False)
 
         context.scene.objects.active = obj.parent  #Mask parent to canvas
         if context.mode != 'PAINT_TEXTURE':
@@ -1472,8 +1481,9 @@ class CanvasResetrot(Operator):
                         break
         else:
             return {'FINISHED'}
-        obj = context.active_object
 
+        #changing
+        obj = context.active_object
         if canvasDimX >= canvasDimY:
             camRatio = canvasDimX/canvasDimY
         else:
@@ -1494,6 +1504,10 @@ class CanvasResetrot(Operator):
                 scene.objects.active = cam
         context.object.data.ortho_scale = camRatio
 
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select = True
+        context.scene.objects.active = obj
+
         if _bool2 == True:                         #if rotation
             bpy.ops.artist_paint.guides_toggle()    #add guides
             scene.ArtistPaint_Bool02 = False   #init the rotation state
@@ -1501,12 +1515,6 @@ class CanvasResetrot(Operator):
         if scene.locking_are_desactived:          #prefs_was_locked
             bpy.ops.artist_paint.prefs_lock_toggle()    #lock the prefs
             scene.locking_are_desactived = False #init the locking state
-
-
-
-        bpy.ops.object.select_all(action='DESELECT')
-        obj.select = True
-        context.scene.objects.active = obj
         return {'FINISHED'}
 
 
@@ -1611,7 +1619,12 @@ class ArtistPanel(Panel):
         row3.operator("artist_paint.frontof_cw",
                  text= "+"+buttName_2, icon = 'TRIA_RIGHT')
         row3.scale_x = 0.40
-        col.separator()
+
+
+
+        box = layout.box()
+        col = box.column(align = True)
+        col.label(text="Canvas camera setup") #INIT
         row = col.row(align = True)
         row.operator("artist_paint.cameraview_paint",
                     text = "Set Shadeless Painting Camera",
@@ -1641,10 +1654,8 @@ class ArtistPanel(Panel):
                     text = "",
                     icon = Ican)
 
-        col.separator()
 
-        box = layout.box()
-        col = box.column(align = True)
+        col.separator()
         col.label(text="Object Masking Tools") #OBJECTS MASKING TOOLS
         col.operator("artist_paint.trace_selection",
                     text = "Mesh Mask from Gpencil",
