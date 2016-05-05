@@ -105,7 +105,8 @@ bpy.utils.register_class(SceneCustomCanvas)
 bpy.types.Scene.artist_paint = \
                     bpy.props.CollectionProperty(type=SceneCustomCanvas)
 
-
+bpy.types.Scene.Viewmode_toggle = \
+                            bpy.props.BoolProperty(default=True)
 bpy.types.Scene.UI_is_activated = \
                             bpy.props.BoolProperty(default=False)
 bpy.types.Scene.maincanvas_is_empty = \
@@ -228,10 +229,55 @@ class OkOperator(Operator):
 #######################
 #       Classes       #
 #######################
+
+#-----------------------------Change to GLSL view mode
+class GLSLViewMode(Operator):
+    bl_description = "GLSL Mode"
+    bl_idname = "artist_paint.glsl"
+    bl_label = "GLSL Mode"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        A = context.scene.Viewmode_toggle
+        return not A
+
+    def execute(self, context):
+        context.scene.game_settings.material_mode = 'GLSL'
+        A = context.scene.Viewmode_toggle
+        if A == True:
+            context.scene.Viewmode_toggle = False
+        else:
+            context.scene.Viewmode_toggle = True
+        return {'FINISHED'}
+
+#-----------------------------Change to MULTITEXTURE view mode
+class MTViewMode(Operator):
+    bl_description = "Multitexture Mode"
+    bl_idname = "artist_paint.multitexture"
+    bl_label = "Multi-Texture Mode"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        A = context.scene.Viewmode_toggle
+        return A
+
+    def execute(self, context):
+        context.scene.game_settings.material_mode = 'MULTITEXTURE'
+        A = context.scene.Viewmode_toggle
+        if A == True:
+            context.scene.Viewmode_toggle = False
+        else:
+            context.scene.Viewmode_toggle = True
+        return {'FINISHED'}
+
+
 class AddDeftImage(Operator):
     '''Create and assign a new default image to the object'''
     bl_idname = "artist_paint.add_default_image"
     bl_label = "Add default image & one diffuse texture"
+    bl_options = {'REGISTER','UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -1559,9 +1605,9 @@ class ArtistPanel(Panel):
         scene = context.scene
         rs = scene.render
         addon_prefs = get_addon_preferences()
-        empty = scene.maincanvas_is_empty
         buttName_1 = str(addon_prefs.customAngle) +"°"
         buttName_2 = str(addon_prefs.customAngle) +"°"
+
 
         #layout.active
         layout = self.layout
@@ -1569,6 +1615,7 @@ class ArtistPanel(Panel):
 
         #change variables with prefs
         #------------------------------------------
+        empty = scene.maincanvas_is_empty
         bordercrop_is_activated = scene.bordercrop_is_activated
         guides_are_activated =  scene.guides_are_activated
         PAL = scene.prefs_are_locked
@@ -1599,8 +1646,18 @@ class ArtistPanel(Panel):
 
 
         box = layout.box()
-        box.label(text="Image State")                #IMAGE STATE
         col = box.column(align = True)
+        row = col.row(align = True)
+        row1 = row.split(align=True)
+        row1.label(text="Image State")                #IMAGE STATE
+        row2 = row.split(align=True)
+        row2.operator("artist_paint.multitexture",
+                    text='', icon="RENDERLAYERS")
+        row2.operator("artist_paint.glsl",
+                    text='', icon="RADIO")
+        row2.scale_x = 1.00
+
+        col.separator()
         row = col.row(align = True)
         row.operator("artist_paint.canvas_load",
                     text = "Import canvas", icon = 'IMAGE_COL')
@@ -1641,7 +1698,7 @@ class ArtistPanel(Panel):
         col.separator()
         row = col.row(align = True)
         row1 = row.split(align=True)
-        row1.label(text="Canvas cam. setup") #INIT
+        row1.label(text="Canvas Cam. Setup") #INIT
         row2 = row.split(align=True)
         row2.operator("artist_paint.cameraview_paint",
                     text = "Camera",
