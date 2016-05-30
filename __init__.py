@@ -1259,7 +1259,7 @@ class CurvePolyInvert(Operator):
     def poll(self, context):
         obj =  context.active_object
         if obj is not None and obj.name is not None:
-            if  obj.name.find('Mask')!=-1:
+            if  obj.name.find('msk_')!=-1:
                 A = context.mode == 'PAINT_TEXTURE'
                 B = obj.type == 'MESH'
                 return A and B
@@ -1273,7 +1273,7 @@ class CurvePolyInvert(Operator):
         paintOPS = bpy.ops.paint
 
         objA = context.active_object             #Active Mask
-        bpy.ops.object.transform_apply(rotation=True)
+        objOPS.transform_apply(rotation=True)
         objPar = objA.parent                     #Select canvas
         objRz = objPar.rotation_euler[2]         #if mainCanvas rotated
 
@@ -1287,9 +1287,9 @@ class CurvePolyInvert(Operator):
 
         #---------------------------------------------------NEW CURVE
         cv = context.active_object               #The new Inverted Mask
-        objOPS.editmode_toggle()                 #toggle curve edit
+        objOPS.editmode_toggle()                 #go to curve edit
         cv.data.dimensions = '2D'                #set to 2D = create face
-        objOPS.editmode_toggle()                 #toggle object mode
+        objOPS.editmode_toggle()                 #return in object mode
 
         #--------------------------------------------------CONVERT MESH
         objOPS.convert(target='MESH')            #convert curve in mesh
@@ -1306,7 +1306,7 @@ class CurvePolyInvert(Operator):
                                  constraint_orientation='GLOBAL')
 
         scene.objects.active = cv                #name the Inverted Mask
-        cv.name = "- " + objA.name[1:]
+        cv.name = "ksm_" + objA.name[4:]
         cv.location[2] = 0.01                    #Raise the Z level inv. mask
         objOPS.editmode_toggle()                 #toggle edit mode
         bpy.ops.uv.project_from_view(camera_bounds=True,
