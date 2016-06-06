@@ -57,9 +57,7 @@ def get_addon_preferences():
     #Par exemple:
     # addon_prefs = get_addon_preferences()
     # addon_prefs.url_smsservice
-
-    addon_preferences = bpy.context.user_preferences.addons[__name__].preferences
-    return addon_preferences
+    return bpy.context.user_preferences.addons[__name__].preferences
 
 #-------------------------------------------get the main canvas datas
 def MainCanvasData(self, context):
@@ -646,7 +644,7 @@ class CameraviewPaint(Operator):
                     canvasName = (main_canvas.filename)[:-4]   #find the name of the maincanvas
                     _camName = "Camera_" + canvasName
                     canvasDimX = main_canvas.dimX
-                    canvasDimY =  main_canvas.dimY
+                    canvasDimY = main_canvas.dimY
                 for obj in scene.objects:
                     if obj.name == canvasName :      #if mainCanvas Mat exist
                         scene.objects.active = obj
