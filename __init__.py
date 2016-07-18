@@ -982,7 +982,7 @@ class TraceSelection(Operator):
         meshOPS.normals_make_consistent(inside=False)#Normals ouside
         bpy.ops.uv.project_from_view(camera_bounds=True,
                                     correct_aspect=False,
-                                    scale_to_bounds=True)#uv cam unwrap
+                                    scale_to_bounds=False)#uv cam unwrap
         for mat in bpy.data.materials:           #Material and texture
             if mat.name == canvasName :          #if mainCanvas Mat exist
                 cv.data.materials.append(mat)    #add main canvas mat
@@ -1181,7 +1181,7 @@ class CloseCurveUnwrap(Operator):
         meshOPS.normals_make_consistent(inside=False)#Normals outside
         bpy.ops.uv.project_from_view(camera_bounds=True,
                                     correct_aspect=False,
-                                    scale_to_bounds=True)#uv cam unwrap
+                                    scale_to_bounds=False)#uv cam unwrap
 
         for mat in bpy.data.materials:
             if mat.name == canvasName :          #if mainCanvas Mat exist
@@ -1307,7 +1307,7 @@ class CurvePolyInvert(Operator):
         meshOPS.normals_make_consistent(inside=False)#Normals outside
         bpy.ops.uv.project_from_view(camera_bounds=True,
                                     correct_aspect=False,
-                                    scale_to_bounds=True)#uv cam unwrap
+                                    scale_to_bounds=False)#uv cam unwrap
 
         for mat in bpy.data.materials:
             if mat.name == canvasName :          #if mainCanvas Mat exist
@@ -2028,11 +2028,11 @@ class ArtistPaintPanelPrefs(AddonPreferences):
             default=15.00,
             min=1)
 
-    category = bpy.props.StringProperty(
-            name="Category",
-            description="Choose a name for the category of the panel",
-            default="Artist Paint 2D",
-            update=update_panel)
+    category =  bpy.props.StringProperty(
+                name="Category",
+                description="Choose a name for the category of the panel",
+                default="Artist Paint 2D",
+                update=update_panel)
 
     def check(context):
         return True
