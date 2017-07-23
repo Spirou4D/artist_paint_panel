@@ -1,2 +1,2 @@
-# artist_panel
-personal macros used for painting in 3d view in blender
+# EZDRAW 
+Personal macros used for 2D painting in 3d view in blender.
